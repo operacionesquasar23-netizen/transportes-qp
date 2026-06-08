@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+const API_URL = "/api/proxy";
 
 async function get(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
@@ -7,9 +7,10 @@ async function get(params: Record<string, string>) {
 }
 
 async function post(action: string, body: object) {
-  const res = await fetch(`${API_URL}?action=${action}`, {
+  const res = await fetch(API_URL, {
     method: "POST",
-    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...body }),
   });
   return res.json();
 }
