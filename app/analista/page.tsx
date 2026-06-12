@@ -104,7 +104,7 @@ export default function AnalistaPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  {["ID", "Fecha", "Solicitante", "Cliente", "Recojo → Entrega", "Servicio", "Cotización", "Status", ""].map((h) => (
+                  {["ID", "Fecha", "Solicitante", "Cliente", "Código", "Recojo → Entrega", "Servicio", "Cotización", "Status", ""].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -125,6 +125,7 @@ export default function AnalistaPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600">{r.FECHA}</td>
                       <td className="px-4 py-3 text-gray-700">{r.SOLICITANTE}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{r.CLIENTE}</td>
+                      <td className="px-4 py-3 text-gray-600">{r.CODIGO}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         {r["RECOJO EN"]} → {r["ENTREGA EN"]}
                       </td>
