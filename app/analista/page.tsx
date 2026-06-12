@@ -3,6 +3,13 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Requerimiento, STATUS_COLORS, STATUSES, Status } from "@/lib/types";
 
+function formatFecha(valor: string): string {
+  if (!valor) return "—";
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) return valor;
+  return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 export default function AnalistaPage() {
   const [reqs, setReqs] = useState<Requerimiento[]>([]);
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
@@ -57,7 +64,7 @@ export default function AnalistaPage() {
   const filtrados = reqs.filter((r) => {
     const matchStatus = filtroStatus === "TODOS" || r.STATUS === filtroStatus;
     const q = busqueda.toLowerCase();
-    const matchBusqueda = !q || [r.CLIENTE, r.SOLICITANTE, r.ID_REQ, r.ELEMENTOS]
+    const matchBusqueda = !q || [r.CLIENTE, r.SOLICITANTE, r.ID_REQ, r.ELEMENTOS, r.CODIGO]
       .some((v) => String(v).toLowerCase().includes(q));
     return matchStatus && matchBusqueda;
   });
@@ -69,7 +76,7 @@ export default function AnalistaPage() {
         <p className="text-sm text-gray-500">{reqs.length} requerimientos en total</p>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="w-full px-4 py-6">
         {msg && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
             {msg}
@@ -80,7 +87,7 @@ export default function AnalistaPage() {
         <div className="flex flex-wrap gap-3 mb-5">
           <input
             type="text"
-            placeholder="Buscar cliente, solicitante, ID..."
+            placeholder="Buscar cliente, solicitante, código, ID..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -104,7 +111,7 @@ export default function AnalistaPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  {["ID", "Fecha", "Solicitante", "Cliente", "Código", "Recojo → Entrega", "Servicio", "Cotización", "Status", ""].map((h) => (
+                  {["ID", "Fecha", "Solicitante", "Cliente", "Código", "Recojo → Entrega", "Servicio", "Elementos", "Cotización", "Transportista", "Status", ""].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -114,25 +121,27 @@ export default function AnalistaPage() {
               <tbody className="divide-y divide-gray-100">
                 {filtrados.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-gray-400">
+                    <td colSpan={12} className="text-center py-10 text-gray-400">
                       No hay requerimientos que coincidan.
                     </td>
                   </tr>
                 ) : (
                   filtrados.map((r) => (
                     <tr key={r.ID_REQ} className="hover:bg-gray-50 transition">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-400">{r.ID_REQ}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">{r.FECHA}</td>
-                      <td className="px-4 py-3 text-gray-700">{r.SOLICITANTE}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{r.CLIENTE}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.CODIGO}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-400 whitespace-nowrap">{r.ID_REQ}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">{formatFecha(r.FECHA)}</td>
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{r.SOLICITANTE}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{r.CLIENTE}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.CODIGO || "—"}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         {r["RECOJO EN"]} → {r["ENTREGA EN"]}
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.SERVICIO}</td>
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{r.ELEMENTOS || "—"}</td>
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
                         {r.COTIZACION ? `S/ ${r.COTIZACION}` : <span className="text-gray-300">—</span>}
                       </td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.TRANSPORTISTA || "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COLORS[r.STATUS as Status]}`}>
                           {r.STATUS}
@@ -164,8 +173,12 @@ export default function AnalistaPage() {
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-y-auto max-h-[90vh]">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <div>
-                <span className="font-mono text-xs text-gray-400">{selected.ID_REQ}</span>
-                <h2 className="font-semibold text-gray-900">{selected.CLIENTE}</h2>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-sm font-bold text-blue-600">{selected.ID_REQ}</span>
+                  <span className="text-gray-400">·</span>
+                  <span className="font-mono text-sm font-bold text-gray-700">{selected.CODIGO || "Sin código"}</span>
+                </div>
+                <h2 className="font-semibold text-gray-900 mt-0.5">{selected.CLIENTE}</h2>
               </div>
               <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
             </div>
@@ -173,16 +186,31 @@ export default function AnalistaPage() {
             <div className="px-6 py-4 bg-gray-50 border-b">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <Info label="Solicitante" value={selected.SOLICITANTE} />
-                <Info label="Fecha" value={selected.FECHA} />
+                <Info label="Fecha" value={formatFecha(selected.FECHA)} />
                 <Info label="Servicio" value={selected.SERVICIO} />
                 <Info label="Razón social" value={selected["RAZON SOCIAL"]} />
                 <Info label="Recojo en" value={selected["RECOJO EN"]} />
                 <Info label="Entrega en" value={selected["ENTREGA EN"]} />
-                <Info label="Elementos" value={selected.ELEMENTOS} />
-                <Info label="Marca" value={selected.MARCA} />
-                <Info label="Cantidad" value={selected.CANTIDAD} />
                 <Info label="Personas" value={selected.PERSONAS} />
+                <Info label="Área" value={selected.AREA} />
               </div>
+              {selected.ELEMENTOS && (
+                <div className="mt-3">
+                  <span className="text-xs text-gray-400 block mb-1">Elementos</span>
+                  <div className="space-y-1">
+                    {selected.ELEMENTOS.split(" | ").map((item, i) => {
+                      const [elem, marca, cant] = item.split("-");
+                      return (
+                        <div key={i} className="flex gap-3 text-sm bg-white border rounded-lg px-3 py-1.5">
+                          <span className="text-gray-800 font-medium">{elem}</span>
+                          {marca && <span className="text-gray-500">{marca}</span>}
+                          {cant && <span className="text-gray-500">× {cant}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="px-6 py-5">

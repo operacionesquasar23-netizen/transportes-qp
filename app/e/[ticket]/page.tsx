@@ -3,11 +3,37 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Requerimiento, STATUS_COLORS, SERVICIOS, Status } from "@/lib/types";
 
+interface Elemento {
+  elemento: string;
+  marca: string;
+  cantidad: string;
+}
+
 const EMPTY_FORM = {
   FECHA: "", AREA: "", CLIENTE: "", CODIGO: "", PERSONAS: "",
-  ELEMENTOS: "", MARCA: "", CANTIDAD: "", "RECOJO EN": "",
-  "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
+  "RECOJO EN": "", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
 };
+
+const EMPTY_ELEMENTO: Elemento = { elemento: "", marca: "", cantidad: "" };
+
+function elementosToString(items: Elemento[]): string {
+  return items.filter(i => i.elemento).map(i => `${i.elemento}-${i.marca}-${i.cantidad}`).join(" | ");
+}
+
+function stringToElementos(str: string): Elemento[] {
+  if (!str) return [{ ...EMPTY_ELEMENTO }];
+  return str.split(" | ").map(item => {
+    const [elemento = "", marca = "", cantidad = ""] = item.split("-");
+    return { elemento, marca, cantidad };
+  });
+}
+
+function formatFecha(valor: string): string {
+  if (!valor) return "—";
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) return valor;
+  return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
 export default function EjecutivoPage({ params }: { params: { ticket: string } }) {
   const { ticket } = params;
@@ -16,6 +42,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   const [reqs, setReqs] = useState<Requerimiento[]>([]);
   const [vista, setVista] = useState<"lista" | "nuevo" | "editar">("lista");
   const [form, setForm] = useState<Record<string, string>>(EMPTY_FORM);
+  const [elementos, setElementos] = useState<Elemento[]>([{ ...EMPTY_ELEMENTO }]);
   const [editId, setEditId] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -36,17 +63,30 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     if (r.ok) setReqs(r.data);
   }
 
-  function set(k: string, v: string) {
+  function setF(k: string, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  function setElemento(idx: number, campo: keyof Elemento, valor: string) {
+    setElementos(prev => prev.map((e, i) => i === idx ? { ...e, [campo]: valor } : e));
+  }
+
+  function agregarElemento() {
+    setElementos(prev => [...prev, { ...EMPTY_ELEMENTO }]);
+  }
+
+  function eliminarElemento(idx: number) {
+    setElementos(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
   }
 
   async function guardar() {
     setLoading(true);
+    const data = { ...form, ELEMENTOS: elementosToString(elementos) };
     let r;
     if (vista === "nuevo") {
-      r = await api.crearRequerimiento(ticket, form);
+      r = await api.crearRequerimiento(ticket, data);
     } else {
-      r = await api.editarRequerimiento(editId, "ejecutivo", form);
+      r = await api.editarRequerimiento(editId, "ejecutivo", data);
     }
     setLoading(false);
     if (r.ok) {
@@ -62,10 +102,11 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   function abrirEditar(req: Requerimiento) {
     setForm({
       FECHA: req.FECHA, AREA: req.AREA, CLIENTE: req.CLIENTE,
-      CODIGO: req.CODIGO, PERSONAS: req.PERSONAS, ELEMENTOS: req.ELEMENTOS,
-      MARCA: req.MARCA, CANTIDAD: req.CANTIDAD, "RECOJO EN": req["RECOJO EN"],
-      "ENTREGA EN": req["ENTREGA EN"], SERVICIO: req.SERVICIO, "RAZON SOCIAL": req["RAZON SOCIAL"],
+      CODIGO: req.CODIGO, PERSONAS: req.PERSONAS,
+      "RECOJO EN": req["RECOJO EN"], "ENTREGA EN": req["ENTREGA EN"],
+      SERVICIO: req.SERVICIO, "RAZON SOCIAL": req["RAZON SOCIAL"],
     });
+    setElementos(stringToElementos(req.ELEMENTOS));
     setEditId(req.ID_REQ);
     setVista("editar");
   }
@@ -93,7 +134,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         </div>
         {vista === "lista" && (
           <button
-            onClick={() => { setForm(EMPTY_FORM); setVista("nuevo"); }}
+            onClick={() => { setForm(EMPTY_FORM); setElementos([{ ...EMPTY_ELEMENTO }]); setVista("nuevo"); }}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
           >
             + Nueva solicitud
@@ -128,14 +169,26 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono text-gray-400">{r.ID_REQ}</span>
+                          {r.CODIGO && <span className="text-xs font-mono text-gray-600 font-medium">{r.CODIGO}</span>}
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[r.STATUS as Status]}`}>
                             {r.STATUS}
                           </span>
                         </div>
                         <p className="font-medium text-gray-900 mt-1">{r.CLIENTE || "—"}</p>
-                        <p className="text-sm text-gray-500">{r.ELEMENTOS} {r.MARCA && `· ${r.MARCA}`} {r.CANTIDAD && `· ${r.CANTIDAD} und.`}</p>
-                        <p className="text-sm text-gray-500">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</p>
-                        <p className="text-xs text-gray-400 mt-1">{r.FECHA} · {r.SERVICIO}</p>
+                        {r.ELEMENTOS && (
+                          <div className="mt-1 space-y-0.5">
+                            {r.ELEMENTOS.split(" | ").map((item, i) => {
+                              const [elem, marca, cant] = item.split("-");
+                              return (
+                                <p key={i} className="text-sm text-gray-500">
+                                  {elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant} und.` : ""}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-500 mt-1">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</p>
+                        <p className="text-xs text-gray-400 mt-1">{formatFecha(r.FECHA)} · {r.SERVICIO}</p>
                         {r.COTIZACION && (
                           <p className="text-sm text-blue-700 mt-1 font-medium">Cotización: S/ {r.COTIZACION}</p>
                         )}
@@ -162,28 +215,79 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               {vista === "nuevo" ? "Nueva solicitud de transporte" : `Editar ${editId}`}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Campo label="Fecha del servicio" value={form.FECHA} onChange={(v) => set("FECHA", v)} type="date" required />
-              <Campo label="Área" value={form.AREA} onChange={(v) => set("AREA", v)} />
-              <Campo label="Cliente" value={form.CLIENTE} onChange={(v) => set("CLIENTE", v)} required />
-              <Campo label="Razón social" value={form["RAZON SOCIAL"]} onChange={(v) => set("RAZON SOCIAL", v)} />
-              <Campo label="Código" value={form.CODIGO} onChange={(v) => set("CODIGO", v)} />
+              <Campo label="Fecha del servicio" value={form.FECHA} onChange={(v) => setF("FECHA", v)} type="date" required />
+              <Campo label="Área" value={form.AREA} onChange={(v) => setF("AREA", v)} />
+              <Campo label="Cliente" value={form.CLIENTE} onChange={(v) => setF("CLIENTE", v)} required />
+              <Campo label="Razón social" value={form["RAZON SOCIAL"]} onChange={(v) => setF("RAZON SOCIAL", v)} />
+              <Campo label="Código" value={form.CODIGO} onChange={(v) => setF("CODIGO", v)} />
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Servicio</label>
                 <select
                   value={form.SERVICIO}
-                  onChange={(e) => set("SERVICIO", e.target.value)}
+                  onChange={(e) => setF("SERVICIO", e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {SERVICIOS.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
-              <Campo label="Recojo en" value={form["RECOJO EN"]} onChange={(v) => set("RECOJO EN", v)} required />
-              <Campo label="Entrega en" value={form["ENTREGA EN"]} onChange={(v) => set("ENTREGA EN", v)} required />
-              <Campo label="Elementos" value={form.ELEMENTOS} onChange={(v) => set("ELEMENTOS", v)} />
-              <Campo label="Marca" value={form.MARCA} onChange={(v) => set("MARCA", v)} />
-              <Campo label="Cantidad" value={form.CANTIDAD} onChange={(v) => set("CANTIDAD", v)} type="number" />
-              <Campo label="Personas" value={form.PERSONAS} onChange={(v) => set("PERSONAS", v)} type="number" />
+              <Campo label="Recojo en" value={form["RECOJO EN"]} onChange={(v) => setF("RECOJO EN", v)} required />
+              <Campo label="Entrega en" value={form["ENTREGA EN"]} onChange={(v) => setF("ENTREGA EN", v)} required />
+              <Campo label="Personas" value={form.PERSONAS} onChange={(v) => setF("PERSONAS", v)} type="number" />
             </div>
+
+            {/* Sección elementos */}
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">Elementos</label>
+                <button
+                  onClick={agregarElemento}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  + Agregar elemento
+                </button>
+              </div>
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2 text-xs text-gray-400 px-1">
+                  <span>Elemento</span><span>Marca</span><span>Cantidad</span>
+                </div>
+                {elementos.map((el, idx) => (
+                  <div key={idx} className="grid grid-cols-3 gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Ej: Cajas"
+                      value={el.elemento}
+                      onChange={(e) => setElemento(idx, "elemento", e.target.value)}
+                      className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Ej: Nike"
+                      value={el.marca}
+                      onChange={(e) => setElemento(idx, "marca", e.target.value)}
+                      className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={el.cantidad}
+                        onChange={(e) => setElemento(idx, "cantidad", e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {elementos.length > 1 && (
+                        <button
+                          onClick={() => eliminarElemento(idx)}
+                          className="text-red-400 hover:text-red-600 px-1 text-lg leading-none"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-6 flex gap-3">
               <button
                 onClick={guardar}
