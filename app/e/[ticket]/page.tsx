@@ -131,6 +131,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
           </button>
         )}
         {vista !== "lista" && (
+          <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition mr-4">← Inicio</a>
           <button onClick={() => setVista("lista")} className="text-sm text-gray-400 hover:text-gray-700 transition">
             ← Volver
           </button>

@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Requerimiento, STATUSES, Status } from "@/lib/types";
 
+const PIN_CORRECTO = "op01";
+
 const STATUS_PILL: Record<string, string> = {
   PENDIENTE: "bg-amber-100 text-amber-700",
   PROGRAMADO: "bg-blue-100 text-blue-700",
@@ -19,6 +21,10 @@ function formatFecha(valor: string): string {
 }
 
 export default function AnalistaPage() {
+  const [autenticado, setAutenticado] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState(false);
+
   const [reqs, setReqs] = useState<Requerimiento[]>([]);
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
@@ -28,13 +34,23 @@ export default function AnalistaPage() {
   const [msg, setMsg] = useState("");
   const [cargando, setCargando] = useState(true);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { if (autenticado) cargar(); }, [autenticado]);
 
   async function cargar() {
     setCargando(true);
     const r = await api.getAllRequerimientos();
     if (r.ok) setReqs(r.data);
     setCargando(false);
+  }
+
+  function verificarPin() {
+    if (pin === PIN_CORRECTO) {
+      setAutenticado(true);
+      setPinError(false);
+    } else {
+      setPinError(true);
+      setPin("");
+    }
   }
 
   function abrirDetalle(req: Requerimiento) {
@@ -87,27 +103,51 @@ export default function AnalistaPage() {
     ejecutado: reqs.filter(r => r.STATUS === "EJECUTADO").length,
   };
 
+  // Pantalla de PIN
+  if (!autenticado) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl border shadow-sm p-10 w-full max-w-sm text-center">
+        <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-3xl mx-auto mb-5">🔐</div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Panel de Operaciones</h2>
+        <p className="text-sm text-gray-400 mb-6">Ingresa el PIN para acceder</p>
+        <input
+          type="password"
+          placeholder="PIN"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && verificarPin()}
+          className={`w-full border rounded-xl px-4 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-400 mb-3 ${pinError ? "border-red-400" : ""}`}
+        />
+        {pinError && <p className="text-red-500 text-xs mb-3">PIN incorrecto. Intenta nuevamente.</p>}
+        <button
+          onClick={verificarPin}
+          className="w-full bg-blue-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition mb-4"
+        >
+          Entrar
+        </button>
+        <a href="/" className="text-sm text-gray-400 hover:text-gray-600">← Volver al inicio</a>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b px-8 py-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Transportes QP</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Panel de operaciones</p>
+        <div className="flex items-center gap-4">
+          <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition">← Inicio</a>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Transportes QP</h1>
+            <p className="text-sm text-gray-400 mt-0.5">Panel de operaciones</p>
+          </div>
         </div>
-        <button
-          onClick={cargar}
-          className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition"
-        >
+        <button onClick={cargar} className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition">
           ↺ Actualizar
         </button>
       </header>
 
       <main className="px-8 py-6">
         {msg && (
-          <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
-            {msg}
-          </div>
+          <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">{msg}</div>
         )}
 
         {/* Métricas */}
@@ -153,46 +193,30 @@ export default function AnalistaPage() {
               <thead>
                 <tr className="border-b">
                   {["ID REQ", "CLIENTE", "CÓDIGO", "SOLICITANTE", "FECHA", "RECOJO → ENTREGA", "SERVICIO", "ELEMENTOS", "COTIZACIÓN", "TRANSPORTISTA", "ESTADO", ""].map((h) => (
-                    <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 tracking-wider whitespace-nowrap">
-                      {h}
-                    </th>
+                    <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {cargando ? (
-                  <tr>
-                    <td colSpan={12} className="text-center py-12 text-gray-400 text-sm">
-                      Cargando...
-                    </td>
-                  </tr>
+                  <tr><td colSpan={12} className="text-center py-12 text-gray-400 text-sm">Cargando...</td></tr>
                 ) : filtrados.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="text-center py-12 text-gray-400 text-sm">
-                      No hay requerimientos que coincidan.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={12} className="text-center py-12 text-gray-400 text-sm">No hay requerimientos que coincidan.</td></tr>
                 ) : (
-                  filtrados.map((r, i) => (
-                    <tr key={r.ID_REQ} className={`border-b last:border-0 hover:bg-gray-50 transition ${i % 2 === 0 ? "" : ""}`}>
+                  filtrados.map((r) => (
+                    <tr key={r.ID_REQ} className="border-b last:border-0 hover:bg-gray-50 transition">
                       <td className="px-5 py-4 font-mono text-xs text-gray-400 whitespace-nowrap">{r.ID_REQ}</td>
                       <td className="px-5 py-4 font-semibold text-gray-800 whitespace-nowrap">{r.CLIENTE}</td>
                       <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.CODIGO || "—"}</td>
                       <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.SOLICITANTE}</td>
                       <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{formatFecha(r.FECHA)}</td>
-                      <td className="px-5 py-4 text-gray-600 whitespace-nowrap text-sm">
-                        {r["RECOJO EN"]} → {r["ENTREGA EN"]}
-                      </td>
+                      <td className="px-5 py-4 text-gray-600 whitespace-nowrap text-sm">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</td>
                       <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.SERVICIO}</td>
                       <td className="px-5 py-4 text-gray-600 max-w-xs">
                         <div className="space-y-0.5">
                           {r.ELEMENTOS ? r.ELEMENTOS.split(" | ").map((item, i) => {
                             const [elem, marca, cant] = item.split("-");
-                            return (
-                              <p key={i} className="text-xs text-gray-500 whitespace-nowrap">
-                                {elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant}` : ""}
-                              </p>
-                            );
+                            return <p key={i} className="text-xs text-gray-500 whitespace-nowrap">{elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant}` : ""}</p>;
                           }) : <span className="text-gray-300">—</span>}
                         </div>
                       </td>
@@ -206,10 +230,7 @@ export default function AnalistaPage() {
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <button
-                          onClick={() => abrirDetalle(r)}
-                          className="text-sm text-blue-600 font-medium hover:underline whitespace-nowrap"
-                        >
+                        <button onClick={() => abrirDetalle(r)} className="text-sm text-blue-600 font-medium hover:underline whitespace-nowrap">
                           Ver →
                         </button>
                       </td>
@@ -224,23 +245,15 @@ export default function AnalistaPage() {
 
       {/* Modal */}
       {selected && (
-        <div
-          className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}
-        >
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}>
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
-            {/* Modal header */}
             <div className="px-6 py-5 border-b">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-sm font-bold text-blue-600">{selected.ID_REQ}</span>
-                    {selected.CODIGO && (
-                      <>
-                        <span className="text-gray-300">·</span>
-                        <span className="font-mono text-sm font-bold text-gray-600">{selected.CODIGO}</span>
-                      </>
-                    )}
+                    {selected.CODIGO && (<><span className="text-gray-300">·</span><span className="font-mono text-sm font-bold text-gray-600">{selected.CODIGO}</span></>)}
                   </div>
                   <h2 className="text-lg font-semibold text-gray-900">{selected.CLIENTE}</h2>
                   <p className="text-sm text-gray-400">{selected["RAZON SOCIAL"]}</p>
@@ -248,8 +261,6 @@ export default function AnalistaPage() {
                 <button onClick={() => setSelected(null)} className="text-gray-300 hover:text-gray-600 text-2xl leading-none mt-1">×</button>
               </div>
             </div>
-
-            {/* Info del requerimiento */}
             <div className="px-6 py-4 bg-gray-50 border-b">
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <Info label="Solicitante" value={selected.SOLICITANTE} />
@@ -277,8 +288,6 @@ export default function AnalistaPage() {
                 </div>
               )}
             </div>
-
-            {/* Gestión analista */}
             <div className="px-6 py-5">
               <p className="text-sm font-semibold text-gray-700 mb-4">Gestión</p>
               <div className="grid grid-cols-2 gap-3">
@@ -289,25 +298,17 @@ export default function AnalistaPage() {
               </div>
               <div className="mt-3">
                 <label className="block text-xs text-gray-500 mb-1">Estado</label>
-                <select
-                  value={form.STATUS}
-                  onChange={(e) => set("STATUS", e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                >
+                <select value={form.STATUS} onChange={(e) => set("STATUS", e.target.value)}
+                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
                   {STATUSES.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div className="mt-5 flex gap-3">
-                <button
-                  onClick={guardar}
-                  disabled={loading}
-                  className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
-                >
+                <button onClick={guardar} disabled={loading}
+                  className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition">
                   {loading ? "Guardando..." : "Guardar cambios"}
                 </button>
-                <button onClick={() => setSelected(null)} className="text-sm text-gray-400 hover:text-gray-600 px-3">
-                  Cerrar
-                </button>
+                <button onClick={() => setSelected(null)} className="text-sm text-gray-400 hover:text-gray-600 px-3">Cerrar</button>
               </div>
               {msg && <p className="mt-3 text-sm text-green-600">{msg}</p>}
             </div>
@@ -342,12 +343,8 @@ function Campo({ label, value, onChange, type = "text" }: {
   return (
     <div>
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+        className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
     </div>
   );
 }
