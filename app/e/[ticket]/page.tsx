@@ -137,7 +137,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         )}
       </header>
 
-      <main className="px-8 py-6 max-w-3xl">
+      <main className="px-8 py-6 max-w-3xl mx-auto">
         {msg && (
           <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
             {msg}
