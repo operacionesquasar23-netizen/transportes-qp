@@ -68,6 +68,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   }
 
   function setF(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
+
   function setEl(idx: number, campo: keyof Elemento, val: string) {
     setElementos(prev => prev.map((e, i) => i === idx ? { ...e, [campo]: val } : e));
   }
@@ -105,6 +106,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
       <div className="bg-white p-10 rounded-2xl border text-center max-w-sm shadow-sm">
         <p className="text-2xl mb-2">🔒</p>
         <p className="text-gray-700 font-medium">{error}</p>
+        <a href="/" className="text-sm text-blue-600 hover:underline mt-4 block">← Volver al inicio</a>
       </div>
     </div>
   );
@@ -118,20 +120,21 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b px-8 py-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Transportes QP</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{ejecutivo}</p>
+        <div className="flex items-center gap-4">
+          <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition">← Inicio</a>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Transportes QP</h1>
+            <p className="text-sm text-gray-400 mt-0.5">{ejecutivo}</p>
+          </div>
         </div>
-        {vista === "lista" && (
+        {vista === "lista" ? (
           <button
             onClick={() => { setForm(EMPTY_FORM); setElementos([{ ...EMPTY_EL }]); setVista("nuevo"); }}
             className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
           >
             + Nueva solicitud
           </button>
-        )}
-        {vista !== "lista" && (
-          <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition mr-4">← Inicio</a>
+        ) : (
           <button onClick={() => setVista("lista")} className="text-sm text-gray-400 hover:text-gray-700 transition">
             ← Volver
           </button>
@@ -146,59 +149,57 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         )}
 
         {vista === "lista" && (
-          <>
-            {reqs.length === 0 ? (
-              <div className="text-center py-20 text-gray-400">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-base font-medium text-gray-500">No tienes solicitudes aún</p>
-                <p className="text-sm mt-1">Usa el botón superior para crear tu primera solicitud.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {reqs.map((r) => (
-                  <div key={r.ID_REQ} className="bg-white border rounded-2xl p-5 hover:shadow-sm transition">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-mono text-xs text-gray-400">{r.ID_REQ}</span>
-                          {r.CODIGO && <span className="font-mono text-xs font-semibold text-gray-600">{r.CODIGO}</span>}
-                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_PILL[r.STATUS as Status] || "bg-gray-100 text-gray-500"}`}>
-                            {r.STATUS}
-                          </span>
-                        </div>
-                        <p className="font-semibold text-gray-900">{r.CLIENTE || "—"}</p>
-                        {r.ELEMENTOS && (
-                          <div className="mt-1">
-                            {r.ELEMENTOS.split(" | ").map((item, i) => {
-                              const [elem, marca, cant] = item.split("-");
-                              return (
-                                <p key={i} className="text-sm text-gray-500">
-                                  {elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant} und.` : ""}
-                                </p>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <p className="text-sm text-gray-500 mt-1">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</p>
-                        <p className="text-xs text-gray-400 mt-1">{formatFecha(r.FECHA)} · {r.SERVICIO}</p>
-                        {r.COTIZACION && (
-                          <p className="text-sm text-blue-600 font-semibold mt-2">Cotización: S/ {r.COTIZACION}</p>
-                        )}
+          reqs.length === 0 ? (
+            <div className="text-center py-20 text-gray-400">
+              <p className="text-4xl mb-3">📋</p>
+              <p className="text-base font-medium text-gray-500">No tienes solicitudes aún</p>
+              <p className="text-sm mt-1">Usa el botón superior para crear tu primera solicitud.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reqs.map((r) => (
+                <div key={r.ID_REQ} className="bg-white border rounded-2xl p-5 hover:shadow-sm transition">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-mono text-xs text-gray-400">{r.ID_REQ}</span>
+                        {r.CODIGO && <span className="font-mono text-xs font-semibold text-gray-600">{r.CODIGO}</span>}
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_PILL[r.STATUS as Status] || "bg-gray-100 text-gray-500"}`}>
+                          {r.STATUS}
+                        </span>
                       </div>
-                      {(r.STATUS === "PENDIENTE" || r.STATUS === "PROGRAMADO") && (
-                        <button
-                          onClick={() => abrirEditar(r)}
-                          className="text-sm text-blue-600 font-medium hover:underline shrink-0"
-                        >
-                          Editar →
-                        </button>
+                      <p className="font-semibold text-gray-900">{r.CLIENTE || "—"}</p>
+                      {r.ELEMENTOS && (
+                        <div className="mt-1">
+                          {r.ELEMENTOS.split(" | ").map((item, i) => {
+                            const [elem, marca, cant] = item.split("-");
+                            return (
+                              <p key={i} className="text-sm text-gray-500">
+                                {elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant} und.` : ""}
+                              </p>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <p className="text-sm text-gray-500 mt-1">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</p>
+                      <p className="text-xs text-gray-400 mt-1">{formatFecha(r.FECHA)} · {r.SERVICIO}</p>
+                      {r.COTIZACION && (
+                        <p className="text-sm text-blue-600 font-semibold mt-2">Cotización: S/ {r.COTIZACION}</p>
                       )}
                     </div>
+                    {(r.STATUS === "PENDIENTE" || r.STATUS === "PROGRAMADO") && (
+                      <button
+                        onClick={() => abrirEditar(r)}
+                        className="text-sm text-blue-600 font-medium hover:underline shrink-0"
+                      >
+                        Editar →
+                      </button>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </>
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {(vista === "nuevo" || vista === "editar") && (
@@ -206,7 +207,6 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
             <h2 className="text-lg font-semibold text-gray-900 mb-6">
               {vista === "nuevo" ? "Nueva solicitud de transporte" : `Editar ${editId}`}
             </h2>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Campo label="Fecha del servicio" value={form.FECHA} onChange={(v) => setF("FECHA", v)} type="date" required />
               <Campo label="Área" value={form.AREA} onChange={(v) => setF("AREA", v)} />
@@ -228,7 +228,6 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <Campo label="Personas" value={form.PERSONAS} onChange={(v) => setF("PERSONAS", v)} type="number" />
             </div>
 
-            {/* Elementos */}
             <div className="mt-6">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium text-gray-700">Elementos</p>
