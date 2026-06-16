@@ -41,37 +41,19 @@ function armarMailto(r: Requerimiento, ejecutivo: string): string {
   const cc = "Ivan.Castro@quasar-btl.pe;Paul.Najarro@quasar-btl.pe";
   const asunto = `SOLICITUD DE MOVILIDAD - ${r.ID_REQ} - ${r.CODIGO || ''} - ${r.CLIENTE}`;
 
-  const elementos = r.ELEMENTOS
-    ? r.ELEMENTOS.split(" | ").map((item, i) => {
-        const [elem, marca, cant] = item.split("-");
-        return `  ${i + 1}. ${elem}${marca ? ` - ${marca}` : ""}${cant ? ` - ${cant} und.` : ""}`;
-      }).join("\n")
-    : "  —";
-
   const cuerpo = [
-    `Estimado equipo,`,
+    `Se ha registrado un nuevo requerimiento de movilidad:`,
     ``,
-    `Se solicita el siguiente servicio de transporte:`,
-    ``,
-    `ID Requerimiento : ${r.ID_REQ}`,
-    `Solicitante      : ${ejecutivo}`,
-    `Fecha de servicio: ${formatFecha(r.FECHA)}`,
-    `Cliente          : ${r.CLIENTE}`,
-    r["RAZON SOCIAL"] ? `Razón social     : ${r["RAZON SOCIAL"]}` : "",
-    r.CODIGO          ? `Código           : ${r.CODIGO}` : "",
-    `Tipo de servicio : ${r.SERVICIO}`,
-    `Recojo en        : ${r["RECOJO EN"]}`,
-    `Entrega en       : ${r["ENTREGA EN"]}`,
-    r.PERSONAS        ? `Personas         : ${r.PERSONAS}` : "",
-    ``,
-    `Elementos a transportar:`,
-    elementos,
-    ``,
-    `Por favor confirmar disponibilidad y cotización.`,
+    `N° REQ   : ${r.ID_REQ}`,
+    `Cliente  : ${r.CLIENTE}`,
+    r.CODIGO ? `Código   : ${r.CODIGO}` : "",
+    `Fecha    : ${formatFecha(r.FECHA)}`,
+    `Servicio : ${r.SERVICIO}`,
+    `Entrega  : ${r["ENTREGA EN"]}`,
     ``,
     `Saludos,`,
     ejecutivo,
-  ].filter(l => l !== undefined && !(l === "" && false)).join("\n");
+  ].filter(l => l !== "").join("\n");
 
   return `mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
 }
