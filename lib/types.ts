@@ -13,6 +13,7 @@ export interface Requerimiento {
   CANTIDAD: string;
   "RECOJO EN": string;
   "ENTREGA EN": string;
+  OBSERVACIONES: string;
   SERVICIO: string;
   COTIZACION: string;
   TRANSPORTISTA: string;
