@@ -11,23 +11,17 @@ const STATUS_PILL: Record<string, string> = {
   CANCELADO: "bg-gray-100 text-gray-500",
 };
 
-interface Elemento {
-  elemento: string;
-  marca: string;
-  cantidad: string;
-}
+interface Elemento { elemento: string; marca: string; cantidad: string; }
+const EMPTY_EL: Elemento = { elemento: "", marca: "", cantidad: "" };
 
 const EMPTY_FORM = {
   FECHA: "", AREA: "", CLIENTE: "", CODIGO: "", PERSONAS: "",
   "RECOJO EN": "", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
 };
 
-const EMPTY_EL: Elemento = { elemento: "", marca: "", cantidad: "" };
-
 function elToStr(items: Elemento[]): string {
   return items.filter(i => i.elemento).map(i => `${i.elemento}-${i.marca}-${i.cantidad}`).join(" | ");
 }
-
 function strToEl(str: string): Elemento[] {
   if (!str) return [{ ...EMPTY_EL }];
   return str.split(" | ").map(item => {
@@ -35,12 +29,51 @@ function strToEl(str: string): Elemento[] {
     return { elemento, marca, cantidad };
   });
 }
-
 function formatFecha(valor: string): string {
   if (!valor) return "—";
   const d = new Date(valor);
   if (isNaN(d.getTime())) return valor;
   return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function armarMailto(r: Requerimiento, ejecutivo: string): string {
+  const to = "Luis.Cucho@quasar-btl.pe";
+  const cc = "Ivan.Castro@quasar-btl.pe;Paul.Najarro@quasar-btl.pe";
+  const asunto = `SOLICITUD DE MOVILIDAD - ${r.ID_REQ} - ${r.CODIGO || ''} - ${r.CLIENTE}`;
+
+  const elementos = r.ELEMENTOS
+    ? r.ELEMENTOS.split(" | ").map((item, i) => {
+        const [elem, marca, cant] = item.split("-");
+        return `  ${i + 1}. ${elem}${marca ? ` - ${marca}` : ""}${cant ? ` - ${cant} und.` : ""}`;
+      }).join("\n")
+    : "  —";
+
+  const cuerpo = [
+    `Estimado equipo,`,
+    ``,
+    `Se solicita el siguiente servicio de transporte:`,
+    ``,
+    `ID Requerimiento : ${r.ID_REQ}`,
+    `Solicitante      : ${ejecutivo}`,
+    `Fecha de servicio: ${formatFecha(r.FECHA)}`,
+    `Cliente          : ${r.CLIENTE}`,
+    r["RAZON SOCIAL"] ? `Razón social     : ${r["RAZON SOCIAL"]}` : "",
+    r.CODIGO          ? `Código           : ${r.CODIGO}` : "",
+    `Tipo de servicio : ${r.SERVICIO}`,
+    `Recojo en        : ${r["RECOJO EN"]}`,
+    `Entrega en       : ${r["ENTREGA EN"]}`,
+    r.PERSONAS        ? `Personas         : ${r.PERSONAS}` : "",
+    ``,
+    `Elementos a transportar:`,
+    elementos,
+    ``,
+    `Por favor confirmar disponibilidad y cotización.`,
+    ``,
+    `Saludos,`,
+    ejecutivo,
+  ].filter(l => l !== undefined && !(l === "" && false)).join("\n");
+
+  return `mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
 }
 
 export default function EjecutivoPage({ params }: { params: { ticket: string } }) {
@@ -68,7 +101,6 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   }
 
   function setF(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
-
   function setEl(idx: number, campo: keyof Elemento, val: string) {
     setElementos(prev => prev.map((e, i) => i === idx ? { ...e, [campo]: val } : e));
   }
@@ -143,9 +175,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
 
       <main className="px-8 py-6 max-w-3xl mx-auto">
         {msg && (
-          <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
-            {msg}
-          </div>
+          <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">{msg}</div>
         )}
 
         {vista === "lista" && (
@@ -187,14 +217,22 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                         <p className="text-sm text-blue-600 font-semibold mt-2">Cotización: S/ {r.COTIZACION}</p>
                       )}
                     </div>
-                    {(r.STATUS === "PENDIENTE" || r.STATUS === "PROGRAMADO") && (
-                      <button
-                        onClick={() => abrirEditar(r)}
-                        className="text-sm text-blue-600 font-medium hover:underline shrink-0"
+                    <div className="flex flex-col gap-2 shrink-0 items-end">
+                      <a
+                        href={armarMailto(r, ejecutivo)}
+                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1"
                       >
-                        Editar →
-                      </button>
-                    )}
+                        ✉️ Enviar correo
+                      </a>
+                      {(r.STATUS === "PENDIENTE" || r.STATUS === "PROGRAMADO") && (
+                        <button
+                          onClick={() => abrirEditar(r)}
+                          className="text-sm text-blue-600 font-medium hover:underline"
+                        >
+                          Editar →
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -215,11 +253,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <Campo label="Código" value={form.CODIGO} onChange={(v) => setF("CODIGO", v)} />
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Servicio</label>
-                <select
-                  value={form.SERVICIO}
-                  onChange={(e) => setF("SERVICIO", e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                >
+                <select value={form.SERVICIO} onChange={(e) => setF("SERVICIO", e.target.value)}
+                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
                   {SERVICIOS.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -253,7 +288,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                         className="border rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-400" />
                       {elementos.length > 1 && (
                         <button onClick={() => setElementos(p => p.filter((_, i) => i !== idx))}
-                          className="text-gray-300 hover:text-red-400 px-1 text-xl leading-none transition">×</button>
+                          className="text-gray-300 hover:text-red-400 px-1 text-xl leading-none">×</button>
                       )}
                     </div>
                   </div>
