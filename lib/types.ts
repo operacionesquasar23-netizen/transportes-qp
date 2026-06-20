@@ -13,6 +13,9 @@ export interface Requerimiento {
   CANTIDAD: string;
   "RECOJO EN": string;
   "ENTREGA EN": string;
+  "HORARIO DE DESPACHO": string;
+  "HORARIO ENTREGA": string;
+  "HORARIO RECOJO": string;
   OBSERVACIONES: string;
   SERVICIO: string;
   COTIZACION: string;

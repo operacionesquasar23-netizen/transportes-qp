@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Requerimiento, SERVICIOS, Status } from "@/lib/types";
 
@@ -63,12 +63,15 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   const [ejecutivo, setEjecutivo] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [reqs, setReqs] = useState<Requerimiento[]>([]);
-  const [vista, setVista] = useState<"lista" | "nuevo" | "editar">("lista");
+  const [vista, setVista] = useState<"lista" | "nuevo" | "editar" | "masivo">("lista");
   const [form, setForm] = useState<Record<string, string>>(EMPTY_FORM);
   const [elementos, setElementos] = useState<Elemento[]>([{ ...EMPTY_EL }]);
   const [editId, setEditId] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [filasMasivo, setFilasMasivo] = useState<Record<string, string>[]>([]);
+  const [cargandoExcel, setCargandoExcel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.validarTicket(ticket).then((r) => {
@@ -115,6 +118,64 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     setVista("editar");
   }
 
+  async function manejarArchivoExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCargandoExcel(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: false });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { raw: false });
+
+      const filas = json.map((row) => ({
+        FECHA: normalizarFecha(row["FECHA"]),
+        CODIGO: String(row["CODIGO"] ?? ""),
+        MARCA: String(row["MARCA"] ?? ""),
+        PERSONAS: String(row["PERSONAS"] ?? ""),
+        ELEMENTOS: String(row["ELEMENTOS"] ?? ""),
+        SERVICIO: String(row["SERVICIO"] ?? "").toUpperCase() || "IDA",
+        "ENTREGA EN": String(row["ENTREGA EN"] ?? ""),
+        "HORARIO DE DESPACHO": String(row["HORARIO SALIDA"] ?? row["HORARIO DE DESPACHO"] ?? ""),
+        "HORARIO ENTREGA": String(row["HORARIO LLEGADA"] ?? row["HORARIO ENTREGA"] ?? ""),
+        "HORARIO RECOJO": String(row["HORARIO RECOJO"] ?? ""),
+        "RAZON SOCIAL": String(row["RAZON SOCIAL"] ?? ""),
+        AREA: "People",
+        "RECOJO EN": "Almacén Surco",
+        CLIENTE: String(row["MARCA"] ?? ""),
+      }));
+
+      setFilasMasivo(filas);
+      setVista("masivo");
+    } catch (err) {
+      setMsg("Error al leer el archivo. Verifica el formato.");
+    }
+    setCargandoExcel(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function normalizarFecha(valor: any): string {
+    if (!valor) return "";
+    if (typeof valor === "string" && valor.includes("-")) return valor;
+    return String(valor);
+  }
+
+  async function confirmarMasivo() {
+    setLoading(true);
+    const r = await api.crearMasivo(ticket, filasMasivo);
+    setLoading(false);
+    if (r.ok) {
+      setMsg(`${r.total} solicitudes creadas correctamente.`);
+      setVista("lista");
+      setFilasMasivo([]);
+      cargarReqs();
+      setTimeout(() => setMsg(""), 5000);
+    } else {
+      setMsg("Error al crear las solicitudes: " + r.error);
+    }
+  }
+
   if (error) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-10 rounded-2xl border text-center max-w-sm shadow-sm">
@@ -142,14 +203,24 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
           </div>
         </div>
         {vista === "lista" ? (
-          <button
-            onClick={() => { setForm(EMPTY_FORM); setElementos([{ ...EMPTY_EL }]); setVista("nuevo"); }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
-          >
-            + Nueva solicitud
-          </button>
+          <div className="flex gap-2">
+            <input type="file" ref={fileInputRef} accept=".xlsx,.xls" onChange={manejarArchivoExcel} className="hidden" />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={cargandoExcel}
+              className="border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              {cargandoExcel ? "Leyendo..." : "📥 Cargar Excel"}
+            </button>
+            <button
+              onClick={() => { setForm(EMPTY_FORM); setElementos([{ ...EMPTY_EL }]); setVista("nuevo"); }}
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
+            >
+              + Nueva solicitud
+            </button>
+          </div>
         ) : (
-          <button onClick={() => setVista("lista")} className="text-sm text-gray-400 hover:text-gray-700 transition">
+          <button onClick={() => { setVista("lista"); setFilasMasivo([]); }} className="text-sm text-gray-400 hover:text-gray-700 transition">
             ← Volver
           </button>
         )}
@@ -285,6 +356,54 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                 {loading ? "Enviando..." : vista === "nuevo" ? "Enviar solicitud" : "Guardar cambios"}
               </button>
               <button onClick={() => setVista("lista")} className="text-sm text-gray-400 hover:text-gray-600 px-3 transition">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {vista === "masivo" && (
+          <div className="bg-white border rounded-2xl p-7 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Confirmar carga masiva</h2>
+            <p className="text-sm text-gray-400 mb-6">{filasMasivo.length} solicitudes serán creadas con estos datos.</p>
+
+            <div className="overflow-x-auto border rounded-xl">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    {["Fecha", "Código", "Marca", "Personas", "Elementos", "Servicio", "Entrega en", "Despacho", "Llegada", "Recojo"].map(h => (
+                      <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-400 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filasMasivo.map((f, i) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f.FECHA}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f.CODIGO}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-800">{f.MARCA}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f.PERSONAS}</td>
+                      <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{f.ELEMENTOS}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f.SERVICIO}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f["ENTREGA EN"]}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{f["HORARIO DE DESPACHO"]}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{f["HORARIO ENTREGA"]}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{f["HORARIO RECOJO"]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={confirmarMasivo}
+                disabled={loading}
+                className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+              >
+                {loading ? "Creando..." : `Confirmar y crear ${filasMasivo.length} solicitudes`}
+              </button>
+              <button onClick={() => { setVista("lista"); setFilasMasivo([]); }} className="text-sm text-gray-400 hover:text-gray-600 px-3 transition">
                 Cancelar
               </button>
             </div>

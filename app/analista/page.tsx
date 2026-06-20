@@ -260,6 +260,16 @@ export default function AnalistaPage() {
                 <Info label="Recojo en" value={selected["RECOJO EN"]} />
                 <Info label="Entrega en" value={selected["ENTREGA EN"]} />
               </div>
+              {(selected["HORARIO DE DESPACHO"] || selected["HORARIO ENTREGA"] || selected["HORARIO RECOJO"]) && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-400 mb-2">Horarios</p>
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <Info label="Despacho" value={selected["HORARIO DE DESPACHO"]} />
+                    <Info label="Llegada" value={selected["HORARIO ENTREGA"]} />
+                    <Info label="Recojo" value={selected["HORARIO RECOJO"]} />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Elementos editables */}

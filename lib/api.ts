@@ -28,6 +28,9 @@ export const api = {
   crearRequerimiento: (ticket: string, data: Record<string, string>) =>
     post("crearRequerimiento", { ticket, ...data }),
 
+  crearMasivo: (ticket: string, filas: Record<string, string>[]) =>
+    post("crearMasivo", { ticket, filas }),
+
   editarRequerimiento: (id: string, rol: string, data: Record<string, string>) =>
     post("editarRequerimiento", { "ID_REQ": id, rol, ...data }),
 
