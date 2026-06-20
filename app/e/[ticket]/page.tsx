@@ -15,7 +15,7 @@ interface Elemento { elemento: string; marca: string; cantidad: string; }
 const EMPTY_EL: Elemento = { elemento: "", marca: "", cantidad: "" };
 
 const EMPTY_FORM = {
-  FECHA: "", AREA: "", CLIENTE: "", CODIGO: "", PERSONAS: "",
+  FECHA: "", AREA: "", CLIENTE: "", CODIGO: "", PERSONAS: "", MARCA: "",
   "RECOJO EN": "", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
 };
 
@@ -107,7 +107,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   function abrirEditar(req: Requerimiento) {
     setForm({
       FECHA: req.FECHA, AREA: req.AREA, CLIENTE: req.CLIENTE, CODIGO: req.CODIGO,
-      PERSONAS: req.PERSONAS, "RECOJO EN": req["RECOJO EN"], "ENTREGA EN": req["ENTREGA EN"],
+      PERSONAS: req.PERSONAS, MARCA: req.MARCA, "RECOJO EN": req["RECOJO EN"], "ENTREGA EN": req["ENTREGA EN"],
       SERVICIO: req.SERVICIO, "RAZON SOCIAL": req["RAZON SOCIAL"],
     });
     setElementos(strToEl(req.ELEMENTOS));
@@ -233,6 +233,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <Campo label="Cliente" value={form.CLIENTE} onChange={(v) => setF("CLIENTE", v)} required />
               <Campo label="Razón social" value={form["RAZON SOCIAL"]} onChange={(v) => setF("RAZON SOCIAL", v)} />
               <Campo label="Código" value={form.CODIGO} onChange={(v) => setF("CODIGO", v)} />
+              <Campo label="Marca / Campaña" value={form.MARCA} onChange={(v) => setF("MARCA", v)} />
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Servicio</label>
                 <select value={form.SERVICIO} onChange={(e) => setF("SERVICIO", e.target.value)}
