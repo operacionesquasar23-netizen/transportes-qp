@@ -71,7 +71,7 @@ function armarMailtoMasivo(ids: string[], filas: Record<string, string>[], ejecu
 
   const items = filas.map((f, i) => {
     const id = ids[i] || "";
-    return `${i + 1}. N° REQ : ${id} | Entrega: ${f["ENTREGA EN"]} | Hora: ${f["HORARIO ENTREGA"] || "—"}`;
+    return `${i + 1}. N° REQ : ${id} | Fecha: ${formatFecha(f.FECHA)} | Entrega: ${f["ENTREGA EN"]} | Servicio: ${f.SERVICIO} | Hora: ${f["HORARIO ENTREGA"] || "—"}`;
   }).join("\n");
 
   const cuerpo = [
@@ -79,8 +79,6 @@ function armarMailtoMasivo(ids: string[], filas: Record<string, string>[], ejecu
     ``,
     `Cliente : ${primero.CLIENTE || primero.MARCA || ""}`,
     codigo ? `Código  : ${codigo}` : "",
-    `Fecha   : ${formatFecha(primero.FECHA)}`,
-    `Servicio: ${primero.SERVICIO}`,
     ``,
     items,
     ``,
