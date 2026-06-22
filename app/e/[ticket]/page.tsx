@@ -211,7 +211,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const wb = XLSX.read(buf, { type: "array", cellDates: true, cellText: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const range = XLSX.utils.decode_range(sheet["!ref"] as string);
 
@@ -234,6 +234,12 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
           if (cell && cell.v !== undefined && cell.v !== "") filaVacia = false;
         }
         if (filaVacia) continue;
+
+        // DEBUG temporal — quitar después de confirmar el formato real
+        console.log("DEBUG FILA", row, {
+          FECHA_cell: porHeader["FECHA"],
+          DESPACHO_cell: porHeader["HORARIO SALIDA"] ?? porHeader["HORARIO DE DESPACHO"],
+        });
 
         filas.push({
           FECHA: normalizarFechaCelda(porHeader["FECHA"]),
