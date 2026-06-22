@@ -31,6 +31,12 @@ function strToEl(str: string): Elemento[] {
 }
 function formatFecha(valor: string): string {
   if (!valor) return "—";
+  // Formato DD/MM/YYYY (el que usa el sistema)
+  const dmy = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
+  // Formato YYYY-MM-DD (input type date)
+  const ymd = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
   const d = new Date(valor);
   if (isNaN(d.getTime())) return valor;
   return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -125,9 +131,9 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: false });
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { raw: false });
+      const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { raw: true });
 
       const filas = json.map((row) => ({
         FECHA: normalizarFecha(row["FECHA"]),
@@ -137,9 +143,9 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         ELEMENTOS: String(row["ELEMENTOS"] ?? ""),
         SERVICIO: String(row["SERVICIO"] ?? "").toUpperCase() || "IDA",
         "ENTREGA EN": String(row["ENTREGA EN"] ?? ""),
-        "HORARIO DE DESPACHO": String(row["HORARIO SALIDA"] ?? row["HORARIO DE DESPACHO"] ?? ""),
-        "HORARIO ENTREGA": String(row["HORARIO LLEGADA"] ?? row["HORARIO ENTREGA"] ?? ""),
-        "HORARIO RECOJO": String(row["HORARIO RECOJO"] ?? ""),
+        "HORARIO DE DESPACHO": normalizarHora(row["HORARIO SALIDA"] ?? row["HORARIO DE DESPACHO"]),
+        "HORARIO ENTREGA": normalizarHora(row["HORARIO LLEGADA"] ?? row["HORARIO ENTREGA"]),
+        "HORARIO RECOJO": normalizarHora(row["HORARIO RECOJO"]),
         "RAZON SOCIAL": String(row["RAZON SOCIAL"] ?? ""),
         AREA: "People",
         "RECOJO EN": "Almacén Surco",
@@ -157,7 +163,55 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
 
   function normalizarFecha(valor: any): string {
     if (!valor) return "";
-    if (typeof valor === "string" && valor.includes("-")) return valor;
+    // Objeto Date (cellDates: true convierte fechas de Excel automáticamente)
+    if (valor instanceof Date && !isNaN(valor.getTime())) {
+      const d = String(valor.getDate()).padStart(2, "0");
+      const m = String(valor.getMonth() + 1).padStart(2, "0");
+      const y = valor.getFullYear();
+      return `${d}/${m}/${y}`;
+    }
+    // String tipo "2026-06-03" o "03-06-2026" o "03/06/2026"
+    if (typeof valor === "string") {
+      const limpio = valor.trim();
+      const isoMatch = limpio.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+      const dmyMatch = limpio.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+      if (dmyMatch) return `${dmyMatch[1].padStart(2, "0")}/${dmyMatch[2].padStart(2, "0")}/${dmyMatch[3]}`;
+      return limpio;
+    }
+    // Número serial de Excel (por si raw:true no convierte con cellDates)
+    if (typeof valor === "number") {
+      const fecha = new Date(Math.round((valor - 25569) * 86400 * 1000));
+      const d = String(fecha.getUTCDate()).padStart(2, "0");
+      const m = String(fecha.getUTCMonth() + 1).padStart(2, "0");
+      const y = fecha.getUTCFullYear();
+      return `${d}/${m}/${y}`;
+    }
+    return String(valor);
+  }
+
+  function normalizarHora(valor: any): string {
+    if (!valor) return "";
+    if (valor instanceof Date && !isNaN(valor.getTime())) {
+      const h = String(valor.getUTCHours()).padStart(2, "0");
+      const min = String(valor.getUTCMinutes()).padStart(2, "0");
+      return `${h}:${min}`;
+    }
+    if (typeof valor === "number") {
+      const totalMin = Math.round((valor % 1) * 24 * 60);
+      const h = String(Math.floor(totalMin / 60)).padStart(2, "0");
+      const min = String(totalMin % 60).padStart(2, "0");
+      return `${h}:${min}`;
+    }
+    if (typeof valor === "string") {
+      // String ISO tipo "1899-12-30T18:08:36.000Z"
+      const isoMatch = valor.match(/T(\d{2}):(\d{2})/);
+      if (isoMatch) return `${isoMatch[1]}:${isoMatch[2]}`;
+      // Ya viene como "08:00" o "8:00 AM"
+      const horaMatch = valor.match(/(\d{1,2}):(\d{2})/);
+      if (horaMatch) return `${horaMatch[1].padStart(2, "0")}:${horaMatch[2]}`;
+      return valor;
+    }
     return String(valor);
   }
 
