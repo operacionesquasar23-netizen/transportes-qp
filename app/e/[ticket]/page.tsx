@@ -62,6 +62,34 @@ function armarMailto(r: Requerimiento, ejecutivo: string): string {
   return `mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
 }
 
+function armarMailtoMasivo(ids: string[], filas: Record<string, string>[], ejecutivo: string): string {
+  const to = "Luis.Cucho@quasar-btl.pe";
+  const cc = "Ivan.Castro@quasar-btl.pe;Paul.Najarro@quasar-btl.pe";
+  const primero = filas[0] || {};
+  const codigo = primero.CODIGO || "";
+  const asunto = `SOLICITUD DE MOVILIDAD - CARGA MASIVA - ${filas.length} tiendas - ${codigo}`;
+
+  const items = filas.map((f, i) => {
+    const id = ids[i] || "";
+    return `${i + 1}. N° REQ : ${id} | Entrega: ${f["ENTREGA EN"]} | Hora: ${f["HORARIO ENTREGA"] || "—"}`;
+  }).join("\n");
+
+  const cuerpo = [
+    `Se han registrado las siguientes solicitudes de movilidad:`,
+    ``,
+    `Cliente : ${primero.CLIENTE || primero.MARCA || ""}`,
+    codigo ? `Código  : ${codigo}` : "",
+    `Fecha   : ${formatFecha(primero.FECHA)}`,
+    `Servicio: ${primero.SERVICIO}`,
+    ``,
+    items,
+    ``,
+    `Saludos,`,
+    ejecutivo,
+  ].filter(l => l !== "").join("\n");
+
+  return `mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+
 // ── Normalización de fecha/hora desde celdas de Excel ──────────
 // Usamos cell.w (texto ya formateado por SheetJS según el number_format
 // de la celda) en lugar de cell.v (valor crudo), porque .w siempre viene
@@ -149,7 +177,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   const [ejecutivo, setEjecutivo] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [reqs, setReqs] = useState<Requerimiento[]>([]);
-  const [vista, setVista] = useState<"lista" | "nuevo" | "editar" | "masivo">("lista");
+  const [vista, setVista] = useState<"lista" | "nuevo" | "editar" | "masivo" | "confirmacion" | "confirmacionMasivo">("lista");
   const [form, setForm] = useState<Record<string, string>>(EMPTY_FORM);
   const [elementos, setElementos] = useState<Elemento[]>([{ ...EMPTY_EL }]);
   const [editId, setEditId] = useState("");
@@ -158,6 +186,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   const [filasMasivo, setFilasMasivo] = useState<Record<string, string>[]>([]);
   const [cargandoExcel, setCargandoExcel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [creado, setCreado] = useState<Requerimiento | null>(null);
+  const [creadosMasivo, setCreadosMasivo] = useState<{ ids: string[]; filas: Record<string, string>[] } | null>(null);
 
   useEffect(() => {
     api.validarTicket(ticket).then((r) => {
@@ -184,10 +214,15 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
       : await api.editarRequerimiento(editId, "ejecutivo", data);
     setLoading(false);
     if (r.ok) {
-      setMsg(vista === "nuevo" ? "Solicitud enviada correctamente." : "Solicitud actualizada.");
-      setVista("lista");
+      if (vista === "nuevo") {
+        setCreado({ ...data, ID_REQ: r.id, SOLICITANTE: ejecutivo || "", STATUS: "PENDIENTE" } as Requerimiento);
+        setVista("confirmacion");
+      } else {
+        setMsg("Solicitud actualizada.");
+        setVista("lista");
+        setTimeout(() => setMsg(""), 4000);
+      }
       cargarReqs();
-      setTimeout(() => setMsg(""), 4000);
     } else {
       setMsg("Error al guardar. Intenta nuevamente.");
     }
@@ -268,11 +303,10 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     const r = await api.crearMasivo(ticket, filasMasivo);
     setLoading(false);
     if (r.ok) {
-      setMsg(`${r.total} solicitudes creadas correctamente.`);
-      setVista("lista");
+      setCreadosMasivo({ ids: r.ids, filas: filasMasivo });
+      setVista("confirmacionMasivo");
       setFilasMasivo([]);
       cargarReqs();
-      setTimeout(() => setMsg(""), 5000);
     } else {
       setMsg("Error al crear las solicitudes: " + r.error);
     }
@@ -507,6 +541,72 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               </button>
               <button onClick={() => { setVista("lista"); setFilasMasivo([]); }} className="text-sm text-gray-400 hover:text-gray-600 px-3 transition">
                 Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {vista === "confirmacion" && creado && (
+          <div className="bg-white border rounded-2xl p-8 shadow-sm text-center">
+            <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">✅</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Solicitud creada correctamente</h2>
+            <p className="text-sm text-gray-400 mb-6">{creado.ID_REQ} · {creado.CLIENTE}</p>
+
+            <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1 mb-6">
+              <p><span className="text-gray-400">N° REQ:</span> <span className="font-medium text-gray-800">{creado.ID_REQ}</span></p>
+              {creado.CODIGO && <p><span className="text-gray-400">Código:</span> <span className="font-medium text-gray-800">{creado.CODIGO}</span></p>}
+              <p><span className="text-gray-400">Fecha:</span> <span className="font-medium text-gray-800">{formatFecha(creado.FECHA)}</span></p>
+              <p><span className="text-gray-400">Servicio:</span> <span className="font-medium text-gray-800">{creado.SERVICIO}</span></p>
+              <p><span className="text-gray-400">Entrega:</span> <span className="font-medium text-gray-800">{creado["ENTREGA EN"]}</span></p>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <a
+                href={armarMailto(creado, ejecutivo || "")}
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
+              >
+                ✉️ Enviar correo de confirmación
+              </a>
+              <button
+                onClick={() => { setVista("lista"); setCreado(null); }}
+                className="text-sm text-gray-500 hover:text-gray-700 px-3"
+              >
+                Ir a mis solicitudes
+              </button>
+            </div>
+          </div>
+        )}
+
+        {vista === "confirmacionMasivo" && creadosMasivo && (
+          <div className="bg-white border rounded-2xl p-8 shadow-sm text-center">
+            <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">✅</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">
+              {creadosMasivo.ids.length} solicitudes creadas correctamente
+            </h2>
+            <p className="text-sm text-gray-400 mb-6">Carga masiva completada</p>
+
+            <div className="bg-gray-50 rounded-xl p-4 text-left text-sm mb-6 max-h-64 overflow-y-auto">
+              {creadosMasivo.filas.map((f, i) => (
+                <p key={i} className="py-1 border-b border-gray-100 last:border-0">
+                  <span className="font-mono text-xs text-gray-400">{creadosMasivo.ids[i]}</span>
+                  {" · "}
+                  <span className="text-gray-700">{f["ENTREGA EN"]}</span>
+                </p>
+              ))}
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <a
+                href={armarMailtoMasivo(creadosMasivo.ids, creadosMasivo.filas, ejecutivo || "")}
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
+              >
+                ✉️ Enviar correo de confirmación
+              </a>
+              <button
+                onClick={() => { setVista("lista"); setCreadosMasivo(null); }}
+                className="text-sm text-gray-500 hover:text-gray-700 px-3"
+              >
+                Ir a mis solicitudes
               </button>
             </div>
           </div>
