@@ -31,10 +31,8 @@ function strToEl(str: string): Elemento[] {
 }
 function formatFecha(valor: string): string {
   if (!valor) return "—";
-  // Formato DD/MM/YYYY (el que usa el sistema)
   const dmy = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
-  // Formato YYYY-MM-DD (input type date)
   const ymd = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
   const d = new Date(valor);
@@ -62,6 +60,88 @@ function armarMailto(r: Requerimiento, ejecutivo: string): string {
   ].filter(l => l !== "").join("\n");
 
   return `mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+}
+
+// ── Normalización de fecha/hora desde celdas de Excel ──────────
+// Usamos cell.w (texto ya formateado por SheetJS según el number_format
+// de la celda) en lugar de cell.v (valor crudo), porque .w siempre viene
+// como string legible y evita lidiar con seriales, Date con año 1899, etc.
+
+function normalizarFechaCelda(cell: any): string {
+  if (!cell) return "";
+  const texto = cell.w !== undefined ? String(cell.w).trim() : String(cell.v ?? "").trim();
+  if (!texto) return "";
+
+  // cell.w para fechas suele venir como "06/03/26" o "03/06/2026" según el formato.
+  // Probamos varios patrones comunes.
+  let m = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    let [, a, b, y] = m;
+    if (y.length === 2) y = "20" + y;
+    // Si el cell.v es un objeto Date, usamos eso directamente (más confiable que adivinar el orden).
+    if (cell.v instanceof Date && !isNaN(cell.v.getTime())) {
+      const d = String(cell.v.getDate()).padStart(2, "0");
+      const mo = String(cell.v.getMonth() + 1).padStart(2, "0");
+      const yr = cell.v.getFullYear();
+      return `${d}/${mo}/${yr}`;
+    }
+    return `${a.padStart(2, "0")}/${b.padStart(2, "0")}/${y}`;
+  }
+
+  if (cell.v instanceof Date && !isNaN(cell.v.getTime())) {
+    const d = String(cell.v.getDate()).padStart(2, "0");
+    const mo = String(cell.v.getMonth() + 1).padStart(2, "0");
+    const yr = cell.v.getFullYear();
+    return `${d}/${mo}/${yr}`;
+  }
+
+  const isoMatch = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+
+  return texto;
+}
+
+function normalizarHoraCelda(cell: any): string {
+  if (!cell) return "";
+  // cell.w para horas viene formateado según number_format, ej. "13:00" o "1:00 PM".
+  const texto = cell.w !== undefined ? String(cell.w).trim() : "";
+  if (texto) {
+    const m24 = texto.match(/^(\d{1,2}):(\d{2})$/);
+    if (m24) return `${m24[1].padStart(2, "0")}:${m24[2]}`;
+
+    const m12 = texto.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+    if (m12) {
+      let h = parseInt(m12[1], 10);
+      const min = m12[2];
+      const ampm = m12[3].toLowerCase();
+      if (ampm === "pm" && h !== 12) h += 12;
+      if (ampm === "am" && h === 12) h = 0;
+      return `${String(h).padStart(2, "0")}:${min}`;
+    }
+  }
+
+  // Fallback: calcular desde el valor crudo si .w no ayudó.
+  const v = cell.v;
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    const h = String(v.getUTCHours()).padStart(2, "0");
+    const min = String(v.getUTCMinutes()).padStart(2, "0");
+    return `${h}:${min}`;
+  }
+  if (typeof v === "number") {
+    const fraccionDia = v % 1;
+    const totalMin = Math.round(fraccionDia * 24 * 60);
+    const h = String(Math.floor(totalMin / 60)).padStart(2, "0");
+    const min = String(totalMin % 60).padStart(2, "0");
+    return `${h}:${min}`;
+  }
+  return texto;
+}
+
+function textoCelda(cell: any): string {
+  if (!cell) return "";
+  if (cell.w !== undefined) return String(cell.w).trim();
+  if (cell.v !== undefined) return String(cell.v).trim();
+  return "";
 }
 
 export default function EjecutivoPage({ params }: { params: { ticket: string } }) {
@@ -133,86 +213,54 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { raw: true });
+      const range = XLSX.utils.decode_range(sheet["!ref"] as string);
 
-      const filas = json.map((row) => ({
-        FECHA: normalizarFecha(row["FECHA"]),
-        CODIGO: String(row["CODIGO"] ?? ""),
-        MARCA: String(row["MARCA"] ?? ""),
-        PERSONAS: String(row["PERSONAS"] ?? ""),
-        ELEMENTOS: String(row["ELEMENTOS"] ?? ""),
-        SERVICIO: String(row["SERVICIO"] ?? "").toUpperCase() || "IDA",
-        "ENTREGA EN": String(row["ENTREGA EN"] ?? ""),
-        "HORARIO DE DESPACHO": normalizarHora(row["HORARIO SALIDA"] ?? row["HORARIO DE DESPACHO"]),
-        "HORARIO ENTREGA": normalizarHora(row["HORARIO LLEGADA"] ?? row["HORARIO ENTREGA"]),
-        "HORARIO RECOJO": normalizarHora(row["HORARIO RECOJO"]),
-        "RAZON SOCIAL": String(row["RAZON SOCIAL"] ?? ""),
-        AREA: "People",
-        "RECOJO EN": "Almacén Surco",
-        CLIENTE: String(row["MARCA"] ?? ""),
-      }));
+      // Encabezados de la fila 1
+      const headers: string[] = [];
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: col })];
+        headers.push(cell ? textoCelda(cell) : "");
+      }
+
+      const filas: Record<string, string>[] = [];
+      for (let row = range.s.r + 1; row <= range.e.r; row++) {
+        const porHeader: Record<string, any> = {};
+        let filaVacia = true;
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const header = headers[col - range.s.c];
+          if (!header) continue;
+          const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
+          porHeader[header] = cell;
+          if (cell && cell.v !== undefined && cell.v !== "") filaVacia = false;
+        }
+        if (filaVacia) continue;
+
+        filas.push({
+          FECHA: normalizarFechaCelda(porHeader["FECHA"]),
+          CODIGO: textoCelda(porHeader["CODIGO"]),
+          MARCA: textoCelda(porHeader["MARCA"]),
+          PERSONAS: textoCelda(porHeader["PERSONAS"]),
+          ELEMENTOS: textoCelda(porHeader["ELEMENTOS"]),
+          SERVICIO: textoCelda(porHeader["SERVICIO"]).toUpperCase() || "IDA",
+          "ENTREGA EN": textoCelda(porHeader["ENTREGA EN"]),
+          "HORARIO DE DESPACHO": normalizarHoraCelda(porHeader["HORARIO SALIDA"] ?? porHeader["HORARIO DE DESPACHO"]),
+          "HORARIO ENTREGA": normalizarHoraCelda(porHeader["HORARIO LLEGADA"] ?? porHeader["HORARIO ENTREGA"]),
+          "HORARIO RECOJO": normalizarHoraCelda(porHeader["HORARIO RECOJO"]),
+          "RAZON SOCIAL": textoCelda(porHeader["RAZON SOCIAL"]),
+          AREA: "People",
+          "RECOJO EN": "Almacén Surco",
+          CLIENTE: textoCelda(porHeader["MARCA"]),
+        });
+      }
 
       setFilasMasivo(filas);
       setVista("masivo");
     } catch (err) {
+      console.error(err);
       setMsg("Error al leer el archivo. Verifica el formato.");
     }
     setCargandoExcel(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function normalizarFecha(valor: any): string {
-    if (!valor) return "";
-    // Objeto Date (cellDates: true convierte fechas de Excel automáticamente)
-    if (valor instanceof Date && !isNaN(valor.getTime())) {
-      const d = String(valor.getDate()).padStart(2, "0");
-      const m = String(valor.getMonth() + 1).padStart(2, "0");
-      const y = valor.getFullYear();
-      return `${d}/${m}/${y}`;
-    }
-    // String tipo "2026-06-03" o "03-06-2026" o "03/06/2026"
-    if (typeof valor === "string") {
-      const limpio = valor.trim();
-      const isoMatch = limpio.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
-      const dmyMatch = limpio.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
-      if (dmyMatch) return `${dmyMatch[1].padStart(2, "0")}/${dmyMatch[2].padStart(2, "0")}/${dmyMatch[3]}`;
-      return limpio;
-    }
-    // Número serial de Excel (por si raw:true no convierte con cellDates)
-    if (typeof valor === "number") {
-      const fecha = new Date(Math.round((valor - 25569) * 86400 * 1000));
-      const d = String(fecha.getUTCDate()).padStart(2, "0");
-      const m = String(fecha.getUTCMonth() + 1).padStart(2, "0");
-      const y = fecha.getUTCFullYear();
-      return `${d}/${m}/${y}`;
-    }
-    return String(valor);
-  }
-
-  function normalizarHora(valor: any): string {
-    if (!valor) return "";
-    if (valor instanceof Date && !isNaN(valor.getTime())) {
-      const h = String(valor.getUTCHours()).padStart(2, "0");
-      const min = String(valor.getUTCMinutes()).padStart(2, "0");
-      return `${h}:${min}`;
-    }
-    if (typeof valor === "number") {
-      const totalMin = Math.round((valor % 1) * 24 * 60);
-      const h = String(Math.floor(totalMin / 60)).padStart(2, "0");
-      const min = String(totalMin % 60).padStart(2, "0");
-      return `${h}:${min}`;
-    }
-    if (typeof valor === "string") {
-      // String ISO tipo "1899-12-30T18:08:36.000Z"
-      const isoMatch = valor.match(/T(\d{2}):(\d{2})/);
-      if (isoMatch) return `${isoMatch[1]}:${isoMatch[2]}`;
-      // Ya viene como "08:00" o "8:00 AM"
-      const horaMatch = valor.match(/(\d{1,2}):(\d{2})/);
-      if (horaMatch) return `${horaMatch[1].padStart(2, "0")}:${horaMatch[2]}`;
-      return valor;
-    }
-    return String(valor);
   }
 
   async function confirmarMasivo() {
