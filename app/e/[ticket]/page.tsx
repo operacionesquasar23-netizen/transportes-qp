@@ -89,6 +89,7 @@ function armarMailtoMasivo(ids: string[], filas: Record<string, string>[], ejecu
   ].filter(l => l !== "").join("\n");
 
   return `mailto:${to}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+}
 
 // ── Normalización de fecha/hora desde celdas de Excel ──────────
 // Usamos cell.w (texto ya formateado por SheetJS según el number_format
