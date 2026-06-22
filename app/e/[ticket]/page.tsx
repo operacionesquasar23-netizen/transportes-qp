@@ -235,12 +235,6 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         }
         if (filaVacia) continue;
 
-        // DEBUG temporal — quitar después de confirmar el formato real
-        console.log("DEBUG FILA", row, {
-          FECHA_cell: porHeader["FECHA"],
-          DESPACHO_cell: porHeader["HORARIO SALIDA"] ?? porHeader["HORARIO DE DESPACHO"],
-        });
-
         filas.push({
           FECHA: normalizarFechaCelda(porHeader["FECHA"]),
           CODIGO: textoCelda(porHeader["CODIGO"]),
