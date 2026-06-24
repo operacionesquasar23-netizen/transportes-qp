@@ -17,6 +17,7 @@ const EMPTY_EL: Elemento = { elemento: "", marca: "", cantidad: "" };
 const EMPTY_FORM = {
   FECHA: "", AREA: "", CLIENTE: "", CODIGO: "", PERSONAS: "", MARCA: "",
   "RECOJO EN": "", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
+  "HORARIO DE DESPACHO": "", "HORARIO ENTREGA": "", "HORARIO RECOJO": "",
 };
 
 function elToStr(items: Elemento[]): string {
@@ -38,6 +39,23 @@ function formatFecha(valor: string): string {
   const d = new Date(valor);
   if (isNaN(d.getTime())) return valor;
   return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// Convierte DD/MM/YYYY (formato del sistema) a YYYY-MM-DD (formato que necesita <input type="date">)
+function fechaParaInput(valor: string): string {
+  if (!valor) return "";
+  const dmy = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(valor)) return valor.slice(0, 10);
+  return "";
+}
+
+// Convierte YYYY-MM-DD (lo que entrega <input type="date">) a DD/MM/YYYY (formato del Sheets)
+function fechaParaGuardar(valor: string): string {
+  if (!valor) return "";
+  const ymd = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
+  return valor;
 }
 
 function armarMailto(r: Requerimiento, ejecutivo: string): string {
@@ -207,7 +225,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
 
   async function guardar() {
     setLoading(true);
-    const data = { ...form, ELEMENTOS: elToStr(elementos) };
+    const data = { ...form, FECHA: fechaParaGuardar(form.FECHA), ELEMENTOS: elToStr(elementos) };
     const r = vista === "nuevo"
       ? await api.crearRequerimiento(ticket, data)
       : await api.editarRequerimiento(editId, "ejecutivo", data);
@@ -229,9 +247,12 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
 
   function abrirEditar(req: Requerimiento) {
     setForm({
-      FECHA: req.FECHA, AREA: req.AREA, CLIENTE: req.CLIENTE, CODIGO: req.CODIGO,
+      FECHA: fechaParaInput(req.FECHA), AREA: req.AREA, CLIENTE: req.CLIENTE, CODIGO: req.CODIGO,
       PERSONAS: req.PERSONAS, MARCA: req.MARCA, "RECOJO EN": req["RECOJO EN"], "ENTREGA EN": req["ENTREGA EN"],
       SERVICIO: req.SERVICIO, "RAZON SOCIAL": req["RAZON SOCIAL"],
+      "HORARIO DE DESPACHO": req["HORARIO DE DESPACHO"] || "",
+      "HORARIO ENTREGA": req["HORARIO ENTREGA"] || "",
+      "HORARIO RECOJO": req["HORARIO RECOJO"] || "",
     });
     setElementos(strToEl(req.ELEMENTOS));
     setEditId(req.ID_REQ);
@@ -450,6 +471,15 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <Campo label="Recojo en" value={form["RECOJO EN"]} onChange={(v) => setF("RECOJO EN", v)} required />
               <Campo label="Entrega en" value={form["ENTREGA EN"]} onChange={(v) => setF("ENTREGA EN", v)} required />
               <Campo label="Personas" value={form.PERSONAS} onChange={(v) => setF("PERSONAS", v)} type="number" />
+            </div>
+
+            <div className="mt-6">
+              <p className="text-sm font-medium text-gray-700 mb-3">Horarios (opcional)</p>
+              <div className="grid grid-cols-3 gap-3">
+                <Campo label="Despacho" value={form["HORARIO DE DESPACHO"]} onChange={(v) => setF("HORARIO DE DESPACHO", v)} type="time" />
+                <Campo label="Entrega" value={form["HORARIO ENTREGA"]} onChange={(v) => setF("HORARIO ENTREGA", v)} type="time" />
+                <Campo label="Recojo" value={form["HORARIO RECOJO"]} onChange={(v) => setF("HORARIO RECOJO", v)} type="time" />
+              </div>
             </div>
 
             <div className="mt-6">
