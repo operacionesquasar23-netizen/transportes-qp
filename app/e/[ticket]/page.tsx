@@ -205,6 +205,9 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [creado, setCreado] = useState<Requerimiento | null>(null);
   const [creadosMasivo, setCreadosMasivo] = useState<{ ids: string[]; filas: Record<string, string>[] } | null>(null);
+  const [mostrarExportar, setMostrarExportar] = useState(false);
+  const [mesExportar, setMesExportar] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const [anioExportar, setAnioExportar] = useState(String(new Date().getFullYear()));
 
   useEffect(() => {
     api.validarTicket(ticket).then((r) => {
@@ -332,6 +335,47 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     }
   }
 
+  async function exportarConsolidadoMes() {
+    const filtrados = reqs.filter((r) => {
+      const m = r.FECHA.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!m) return false;
+      const mes = m[2].padStart(2, "0");
+      const anio = m[3];
+      return mes === mesExportar && anio === anioExportar;
+    });
+
+    if (filtrados.length === 0) {
+      setMsg("No hay solicitudes para el mes seleccionado.");
+      setMostrarExportar(false);
+      setTimeout(() => setMsg(""), 4000);
+      return;
+    }
+
+    const XLSX = await import("xlsx");
+    const columnas = [
+      "ID_REQ", "SOLICITANTE", "FECHA", "AREA", "CLIENTE", "CODIGO",
+      "PERSONAS", "ELEMENTOS", "MARCA", "CANTIDAD", "RECOJO EN", "ENTREGA EN",
+      "HORARIO DE DESPACHO", "HORARIO ENTREGA", "HORARIO RECOJO", "OBSERVACIONES",
+      "SERVICIO", "COTIZACION", "TRANSPORTISTA", "PLACA", "APROBADO POR",
+      "STATUS", "RAZON SOCIAL",
+    ];
+
+    const data = filtrados.map((r) => {
+      const row: Record<string, string> = {};
+      columnas.forEach((c) => { row[c] = (r as any)[c] ?? ""; });
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data, { header: columnas });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Consolidado");
+
+    const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const nombreMes = meses[parseInt(mesExportar, 10) - 1];
+    XLSX.writeFile(wb, `Consolidado_${nombreMes}_${anioExportar}_${ejecutivo}.xlsx`);
+    setMostrarExportar(false);
+  }
+
   if (error) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-10 rounded-2xl border text-center max-w-sm shadow-sm">
@@ -361,6 +405,12 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         {vista === "lista" ? (
           <div className="flex gap-2">
             <input type="file" ref={fileInputRef} accept=".xlsx,.xls" onChange={manejarArchivoExcel} className="hidden" />
+            <button
+              onClick={() => setMostrarExportar(true)}
+              className="border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+            >
+              📊 Exportar mes
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={cargandoExcel}
@@ -641,6 +691,47 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
           </div>
         )}
       </main>
+
+      {mostrarExportar && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setMostrarExportar(false); }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Exportar consolidado</h2>
+            <p className="text-sm text-gray-400 mb-5">Selecciona el mes y año a descargar.</p>
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Mes</label>
+                <select value={mesExportar} onChange={(e) => setMesExportar(e.target.value)}
+                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  {["01","02","03","04","05","06","07","08","09","10","11","12"].map((m, i) => (
+                    <option key={m} value={m}>
+                      {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][i]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Año</label>
+                <select value={anioExportar} onChange={(e) => setAnioExportar(e.target.value)}
+                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  {[2025, 2026, 2027].map((y) => (
+                    <option key={y} value={String(y)}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={exportarConsolidadoMes}
+                className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition">
+                📊 Descargar Excel
+              </button>
+              <button onClick={() => setMostrarExportar(false)} className="text-sm text-gray-400 hover:text-gray-600 px-3">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
