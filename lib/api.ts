@@ -36,4 +36,10 @@ export const api = {
 
   cambiarStatus: (id: string, status: string) =>
     post("cambiarStatus", { "ID_REQ": id, status }),
+
+  getTransportistas: () =>
+    get({ action: "getTransportistas" }),
+
+  agregarTransportista: (nombre: string) =>
+    post("agregarTransportista", { nombre }),
 };

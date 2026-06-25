@@ -28,10 +28,16 @@ function strToEl(str: string): Elemento[] {
 }
 function formatFecha(valor: string): string {
   if (!valor) return "—";
+  const dmy = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
+  const ymd = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
   const d = new Date(valor);
   if (isNaN(d.getTime())) return valor;
   return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
+
+const OTRO = "__otro__";
 
 export default function AnalistaPage() {
   const [autenticado, setAutenticado] = useState(false);
@@ -48,13 +54,22 @@ export default function AnalistaPage() {
   const [msg, setMsg] = useState("");
   const [cargando, setCargando] = useState(true);
 
-  useEffect(() => { if (autenticado) cargar(); }, [autenticado]);
+  const [transportistas, setTransportistas] = useState<string[]>([]);
+  const [transportistaSel, setTransportistaSel] = useState("");
+  const [nuevoTransportista, setNuevoTransportista] = useState("");
+
+  useEffect(() => { if (autenticado) { cargar(); cargarTransportistas(); } }, [autenticado]);
 
   async function cargar() {
     setCargando(true);
     const r = await api.getAllRequerimientos();
     if (r.ok) setReqs(r.data);
     setCargando(false);
+  }
+
+  async function cargarTransportistas() {
+    const r = await api.getTransportistas();
+    if (r.ok) setTransportistas(r.data);
   }
 
   function verificarPin() {
@@ -73,6 +88,18 @@ export default function AnalistaPage() {
       STATUS: req.STATUS,
     });
     setElementos(strToEl(req.ELEMENTOS));
+    // Si el transportista actual ya está en la lista, lo preseleccionamos.
+    // Si no está (dato antiguo o eliminado de la lista), lo dejamos en "Otro" con su nombre visible.
+    if (req.TRANSPORTISTA && transportistas.includes(req.TRANSPORTISTA)) {
+      setTransportistaSel(req.TRANSPORTISTA);
+      setNuevoTransportista("");
+    } else if (req.TRANSPORTISTA) {
+      setTransportistaSel(OTRO);
+      setNuevoTransportista(req.TRANSPORTISTA);
+    } else {
+      setTransportistaSel("");
+      setNuevoTransportista("");
+    }
     setMsg("");
   }
 
@@ -81,12 +108,36 @@ export default function AnalistaPage() {
     setElementos(prev => prev.map((e, i) => i === idx ? { ...e, [campo]: val } : e));
   }
 
+  function manejarCambioTransportista(valor: string) {
+    setTransportistaSel(valor);
+    if (valor === OTRO) {
+      setF("TRANSPORTISTA", "");
+    } else {
+      setF("TRANSPORTISTA", valor);
+      setNuevoTransportista("");
+    }
+  }
+
   async function guardar() {
     if (!selected) return;
     setLoading(true);
+
+    // Si eligió "Otro" y escribió un nombre nuevo, lo registramos en la lista
+    // antes de guardar el requerimiento, para que quede disponible la próxima vez.
+    let transportistaFinal = form.TRANSPORTISTA;
+    if (transportistaSel === OTRO && nuevoTransportista.trim()) {
+      transportistaFinal = nuevoTransportista.trim();
+      await api.agregarTransportista(transportistaFinal);
+      setTransportistas(prev => prev.includes(transportistaFinal) ? prev : [...prev, transportistaFinal]);
+    }
+
     const { STATUS: newStatus, ...resto } = form;
     const [r1, r2] = await Promise.all([
-      api.editarRequerimiento(selected.ID_REQ, "analista", { ...resto, ELEMENTOS: elToStr(elementos) }),
+      api.editarRequerimiento(selected.ID_REQ, "analista", {
+        ...resto,
+        TRANSPORTISTA: transportistaFinal,
+        ELEMENTOS: elToStr(elementos),
+      }),
       api.cambiarStatus(selected.ID_REQ, newStatus),
     ]);
     setLoading(false);
@@ -312,7 +363,26 @@ export default function AnalistaPage() {
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Cotización (S/)" value={form.COTIZACION} onChange={(v) => setF("COTIZACION", v)} type="number" />
                 <Campo label="Aprobado por" value={form["APROBADO POR"]} onChange={(v) => setF("APROBADO POR", v)} />
-                <Campo label="Transportista" value={form.TRANSPORTISTA} onChange={(v) => setF("TRANSPORTISTA", v)} />
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Transportista</label>
+                  <select value={transportistaSel} onChange={(e) => manejarCambioTransportista(e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="">Seleccionar...</option>
+                    {transportistas.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <option value={OTRO}>+ Otro...</option>
+                  </select>
+                  {transportistaSel === OTRO && (
+                    <input
+                      type="text"
+                      placeholder="Nombre del nuevo transportista"
+                      value={nuevoTransportista}
+                      onChange={(e) => setNuevoTransportista(e.target.value)}
+                      className="w-full border rounded-xl px-3 py-2 text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  )}
+                </div>
+
                 <Campo label="Placa" value={form.PLACA} onChange={(v) => setF("PLACA", v)} />
               </div>
               <div className="mt-3">
