@@ -253,10 +253,10 @@ export default function AnalistaPage() {
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{formatFecha(r.FECHA)}</td>
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap text-sm">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</td>
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.SERVICIO}</td>
-                    <td className="px-5 py-4 text-gray-600 max-w-xs">
+                    <td className="px-5 py-4 text-gray-600 max-w-[180px]">
                       {r.ELEMENTOS ? r.ELEMENTOS.split(" | ").map((item, i) => {
                         const [elem, marca, cant] = item.split("-");
-                        return <p key={i} className="text-xs text-gray-500 whitespace-nowrap">{elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant}` : ""}</p>;
+                        return <p key={i} className="text-xs text-gray-500 truncate">{elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant}` : ""}</p>;
                       }) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-5 py-4 text-gray-700 whitespace-nowrap font-medium">
