@@ -15,8 +15,8 @@ interface Elemento { elemento: string; marca: string; cantidad: string; }
 const EMPTY_EL: Elemento = { elemento: "", marca: "", cantidad: "" };
 
 const EMPTY_FORM = {
-  FECHA: "", AREA: "", CLIENTE: "", CODIGO: "", PERSONAS: "", MARCA: "",
-  "RECOJO EN": "", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
+  FECHA: "", AREA: "People", CLIENTE: "", CODIGO: "", PERSONAS: "", MARCA: "",
+  "RECOJO EN": "Almacén Surco", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
   "HORARIO DE DESPACHO": "", "HORARIO ENTREGA": "", "HORARIO RECOJO": "",
 };
 
@@ -520,7 +520,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               </div>
               <Campo label="Recojo en" value={form["RECOJO EN"]} onChange={(v) => setF("RECOJO EN", v)} required />
               <Campo label="Entrega en" value={form["ENTREGA EN"]} onChange={(v) => setF("ENTREGA EN", v)} required />
-              <Campo label="Personas" value={form.PERSONAS} onChange={(v) => setF("PERSONAS", v)} type="number" />
+              <Campo label="Personas" value={form.PERSONAS} onChange={(v) => setF("PERSONAS", v)} placeholder="Ej: 2 (1 supervisor, 1 anfitriona)" />
             </div>
 
             <div className="mt-6">
@@ -736,15 +736,15 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   );
 }
 
-function Campo({ label, value, onChange, type = "text", required = false }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; required?: boolean;
+function Campo({ label, value, onChange, type = "text", required = false, placeholder = "" }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; required?: boolean; placeholder?: string;
 }) {
   return (
     <div>
       <label className="block text-xs text-gray-500 mb-1">
         {label}{required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
         className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
     </div>
   );
