@@ -31,8 +31,8 @@ export const api = {
   crearMasivo: (ticket: string, filas: Record<string, string>[]) =>
     post("crearMasivo", { ticket, filas }),
 
-  editarRequerimiento: (id: string, rol: string, data: Record<string, string>) =>
-    post("editarRequerimiento", { "ID_REQ": id, rol, ...data }),
+  editarRequerimiento: (id: string, rol: string, data: Record<string, string>, ticket?: string) =>
+    post("editarRequerimiento", { "ID_REQ": id, rol, ticket, ...data }),
 
   cambiarStatus: (id: string, status: string) =>
     post("cambiarStatus", { "ID_REQ": id, status }),
@@ -42,4 +42,7 @@ export const api = {
 
   agregarTransportista: (nombre: string) =>
     post("agregarTransportista", { nombre }),
+
+  getLogCambios: (id: string) =>
+    get({ action: "getLogCambios", id }),
 };

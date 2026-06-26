@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Requerimiento, SERVICIOS, Status } from "@/lib/types";
+import { Requerimiento, SERVICIOS, Status, STATUSES } from "@/lib/types";
 
 const STATUS_PILL: Record<string, string> = {
   PENDIENTE: "bg-amber-100 text-amber-700",
@@ -194,6 +194,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
   const [ejecutivo, setEjecutivo] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [reqs, setReqs] = useState<Requerimiento[]>([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [vista, setVista] = useState<"lista" | "nuevo" | "editar" | "masivo" | "confirmacion" | "confirmacionMasivo">("lista");
   const [form, setForm] = useState<Record<string, string>>(EMPTY_FORM);
   const [elementos, setElementos] = useState<Elemento[]>([{ ...EMPTY_EL }]);
@@ -231,7 +233,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     const data = { ...form, FECHA: fechaParaGuardar(form.FECHA), ELEMENTOS: elToStr(elementos) };
     const r = vista === "nuevo"
       ? await api.crearRequerimiento(ticket, data)
-      : await api.editarRequerimiento(editId, "ejecutivo", data);
+      : await api.editarRequerimiento(editId, "ejecutivo", data, ticket);
     setLoading(false);
     if (r.ok) {
       if (vista === "nuevo") {
@@ -392,35 +394,43 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     </div>
   );
 
+  const reqsFiltrados = reqs.filter((r) => {
+    const matchStatus = filtroStatus === "TODOS" || r.STATUS === filtroStatus;
+    const q = busqueda.toLowerCase();
+    const matchBusqueda = !q || [r.CLIENTE, r.CODIGO, r.FECHA, formatFecha(r.FECHA)]
+      .some((v) => String(v).toLowerCase().includes(q));
+    return matchStatus && matchBusqueda;
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <header className="bg-white border-b px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 sm:gap-4">
           <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition">← Inicio</a>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Transportes QP</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Transportes QP</h1>
             <p className="text-sm text-gray-400 mt-0.5">{ejecutivo}</p>
           </div>
         </div>
         {vista === "lista" ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input type="file" ref={fileInputRef} accept=".xlsx,.xls" onChange={manejarArchivoExcel} className="hidden" />
             <button
               onClick={() => setMostrarExportar(true)}
-              className="border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+              className="border border-gray-200 text-gray-600 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-gray-50 transition flex-1 sm:flex-initial"
             >
-              📊 Exportar mes
+              📊 Exportar
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={cargandoExcel}
-              className="border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+              className="border border-gray-200 text-gray-600 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50 flex-1 sm:flex-initial"
             >
               {cargandoExcel ? "Leyendo..." : "📥 Cargar Excel"}
             </button>
             <button
               onClick={() => { setForm(EMPTY_FORM); setElementos([{ ...EMPTY_EL }]); setVista("nuevo"); }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
+              className="bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-blue-700 transition flex-1 sm:flex-initial"
             >
               + Nueva solicitud
             </button>
@@ -432,7 +442,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
         )}
       </header>
 
-      <main className="px-8 py-6 max-w-3xl mx-auto">
+      <main className="px-4 sm:px-8 py-6 max-w-3xl mx-auto">
         {msg && (
           <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">{msg}</div>
         )}
@@ -445,8 +455,39 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <p className="text-sm mt-1">Usa el botón superior para crear tu primera solicitud.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {reqs.map((r) => (
+            <>
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente, código o fecha..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="w-full border rounded-xl px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 mb-5">
+                {["TODOS", ...STATUSES].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFiltroStatus(s)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition border ${
+                      filtroStatus === s
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    {s === "TODOS" ? "Todos" : s}
+                  </button>
+                ))}
+              </div>
+
+              {reqsFiltrados.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                  <p className="text-sm">No hay solicitudes que coincidan con tu búsqueda.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reqsFiltrados.map((r) => (
                 <div key={r.ID_REQ} className="bg-white border rounded-2xl p-5 hover:shadow-sm transition">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -494,8 +535,10 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                  ))}
+                </div>
+              )}
+            </>
           )
         )}
 
@@ -525,7 +568,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
 
             <div className="mt-6">
               <p className="text-sm font-medium text-gray-700 mb-3">Horarios (opcional)</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Campo label="Despacho" value={form["HORARIO DE DESPACHO"]} onChange={(v) => setF("HORARIO DE DESPACHO", v)} type="time" />
                 <Campo label="Entrega" value={form["HORARIO ENTREGA"]} onChange={(v) => setF("HORARIO ENTREGA", v)} type="time" />
                 <Campo label="Recojo" value={form["HORARIO RECOJO"]} onChange={(v) => setF("HORARIO RECOJO", v)} type="time" />
@@ -639,7 +682,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <p><span className="text-gray-400">Entrega:</span> <span className="font-medium text-gray-800">{creado["ENTREGA EN"]}</span></p>
             </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
                 href={armarMailto(creado, ejecutivo || "")}
                 className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
@@ -674,7 +717,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               ))}
             </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
                 href={armarMailtoMasivo(creadosMasivo.ids, creadosMasivo.filas, ejecutivo || "")}
                 className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition"

@@ -48,6 +48,8 @@ export default function AnalistaPage() {
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [selected, setSelected] = useState<Requerimiento | null>(null);
+  const [logCambios, setLogCambios] = useState<any[]>([]);
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [elementos, setElementos] = useState<Elemento[]>([{ ...EMPTY_EL }]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +103,11 @@ export default function AnalistaPage() {
       setNuevoTransportista("");
     }
     setMsg("");
+    setMostrarHistorial(false);
+    setLogCambios([]);
+    api.getLogCambios(req.ID_REQ).then((r) => {
+      if (r.ok) setLogCambios(r.data);
+    });
   }
 
   function setF(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
@@ -189,23 +196,23 @@ export default function AnalistaPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition">← Inicio</a>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Transportes QP</h1>
+      <header className="bg-white border-b px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <a href="/" className="text-sm text-gray-400 hover:text-gray-700 transition shrink-0">← Inicio</a>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Transportes QP</h1>
             <p className="text-sm text-gray-400 mt-0.5">Panel de operaciones</p>
           </div>
         </div>
-        <button onClick={cargar} className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition">
+        <button onClick={cargar} className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition shrink-0">
           ↺ Actualizar
         </button>
       </header>
 
-      <main className="px-8 py-6">
+      <main className="px-4 sm:px-8 py-6">
         {msg && <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">{msg}</div>}
 
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <MetricCard label="Total" value={conteos.total} color="text-blue-600" bg="bg-blue-50" />
           <MetricCard label="Pendientes" value={conteos.pendiente} color="text-amber-600" bg="bg-amber-50" />
           <MetricCard label="Programados" value={conteos.programado} color="text-indigo-600" bg="bg-indigo-50" />
@@ -299,6 +306,36 @@ export default function AnalistaPage() {
                 </div>
                 <button onClick={() => setSelected(null)} className="text-gray-300 hover:text-gray-600 text-2xl leading-none mt-1">×</button>
               </div>
+              <button
+                onClick={() => setMostrarHistorial(!mostrarHistorial)}
+                className="mt-3 text-xs text-blue-600 hover:underline font-medium"
+              >
+                {mostrarHistorial ? "Ocultar historial" : `Ver historial de cambios (${logCambios.length})`}
+              </button>
+              {mostrarHistorial && (
+                <div className="mt-3 bg-gray-50 rounded-xl p-3 max-h-48 overflow-y-auto">
+                  {logCambios.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-2">Sin cambios registrados aún.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {logCambios.map((c, i) => (
+                        <div key={i} className="text-xs border-b border-gray-200 last:border-0 pb-2 last:pb-0">
+                          <div className="flex items-center justify-between text-gray-400 mb-0.5">
+                            <span className="font-medium text-gray-600">{c.QUIEN}</span>
+                            <span>{c.FECHA_HORA}</span>
+                          </div>
+                          <p className="text-gray-700">
+                            <span className="font-medium">{c.CAMPO}</span>:{" "}
+                            <span className="text-red-500 line-through">{c.VALOR_ANTERIOR || "—"}</span>
+                            {" → "}
+                            <span className="text-green-600">{c.VALOR_NUEVO || "—"}</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Info solicitante */}
