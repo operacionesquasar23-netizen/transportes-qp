@@ -251,6 +251,25 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
     }
   }
 
+  async function cancelarSolicitud() {
+    if (!editId) return;
+    const confirmado = window.confirm(
+      `¿Seguro que deseas cancelar la solicitud ${editId}? El analista de operaciones será notificado.`
+    );
+    if (!confirmado) return;
+    setLoading(true);
+    const r = await api.cambiarStatus(editId, "CANCELADO", "ejecutivo", ticket);
+    setLoading(false);
+    if (r.ok) {
+      setMsg("Solicitud cancelada.");
+      setVista("lista");
+      cargarReqs();
+      setTimeout(() => setMsg(""), 4000);
+    } else {
+      setMsg("Error al cancelar. Intenta nuevamente.");
+    }
+  }
+
   function abrirEditar(req: Requerimiento) {
     setForm({
       FECHA: fechaParaInput(req.FECHA), AREA: req.AREA, CLIENTE: req.CLIENTE, CODIGO: req.CODIGO,
@@ -615,14 +634,25 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               </div>
             </div>
 
-            <div className="mt-7 flex gap-3">
-              <button onClick={guardar} disabled={loading}
-                className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition">
-                {loading ? "Enviando..." : vista === "nuevo" ? "Enviar solicitud" : "Guardar cambios"}
-              </button>
-              <button onClick={() => setVista("lista")} className="text-sm text-gray-400 hover:text-gray-600 px-3 transition">
-                Cancelar
-              </button>
+            <div className="mt-7 flex items-center justify-between gap-3">
+              <div className="flex gap-3">
+                <button onClick={guardar} disabled={loading}
+                  className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition">
+                  {loading ? "Enviando..." : vista === "nuevo" ? "Enviar solicitud" : "Guardar cambios"}
+                </button>
+                <button onClick={() => setVista("lista")} className="text-sm text-gray-400 hover:text-gray-600 px-3 transition">
+                  Cancelar
+                </button>
+              </div>
+              {vista === "editar" && (
+                <button
+                  onClick={cancelarSolicitud}
+                  disabled={loading}
+                  className="text-sm text-red-500 hover:text-red-700 hover:underline font-medium px-3 transition disabled:opacity-50"
+                >
+                  Cancelar solicitud
+                </button>
+              )}
             </div>
           </div>
         )}

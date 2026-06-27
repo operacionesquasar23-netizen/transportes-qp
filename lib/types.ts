@@ -26,6 +26,7 @@ export interface Requerimiento {
   "APROBADO POR": string;
   STATUS: Status;
   "RAZON SOCIAL": string;
+  NOTIFICAR: string;
 }
 
 export const STATUS_COLORS: Record<Status, string> = {

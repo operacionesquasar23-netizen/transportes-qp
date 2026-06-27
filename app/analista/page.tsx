@@ -108,6 +108,13 @@ export default function AnalistaPage() {
     api.getLogCambios(req.ID_REQ).then((r) => {
       if (r.ok) setLogCambios(r.data);
     });
+    // Si el requerimiento tenía una alerta de cambio del ejecutivo, la limpiamos
+    // al abrir el detalle (se considera "visto" por el analista).
+    if (req.NOTIFICAR === "SI") {
+      api.marcarVisto(req.ID_REQ).then(() => {
+        setReqs(prev => prev.map(r => r.ID_REQ === req.ID_REQ ? { ...r, NOTIFICAR: "" } : r));
+      });
+    }
   }
 
   function setF(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
@@ -145,7 +152,7 @@ export default function AnalistaPage() {
         TRANSPORTISTA: transportistaFinal,
         ELEMENTOS: elToStr(elementos),
       }),
-      api.cambiarStatus(selected.ID_REQ, newStatus),
+      api.cambiarStatus(selected.ID_REQ, newStatus, "analista"),
     ]);
     setLoading(false);
     if (r1.ok && r2.ok) {
@@ -171,6 +178,7 @@ export default function AnalistaPage() {
     pendiente: reqs.filter(r => r.STATUS === "PENDIENTE").length,
     programado: reqs.filter(r => r.STATUS === "PROGRAMADO").length,
     ejecutado: reqs.filter(r => r.STATUS === "EJECUTADO").length,
+    cambios: reqs.filter(r => r.NOTIFICAR === "SI").length,
   };
 
   if (!autenticado) return (
@@ -212,11 +220,12 @@ export default function AnalistaPage() {
       <main className="px-4 sm:px-8 py-6">
         {msg && <div className="mb-5 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">{msg}</div>}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <MetricCard label="Total" value={conteos.total} color="text-blue-600" bg="bg-blue-50" />
           <MetricCard label="Pendientes" value={conteos.pendiente} color="text-amber-600" bg="bg-amber-50" />
           <MetricCard label="Programados" value={conteos.programado} color="text-indigo-600" bg="bg-indigo-50" />
           <MetricCard label="Ejecutados" value={conteos.ejecutado} color="text-green-600" bg="bg-green-50" />
+          <MetricCard label="Cambios sin ver" value={conteos.cambios} color="text-red-600" bg="bg-red-50" />
         </div>
 
         <div className="mb-4">
@@ -252,7 +261,7 @@ export default function AnalistaPage() {
                 ) : filtrados.length === 0 ? (
                   <tr><td colSpan={12} className="text-center py-12 text-gray-400 text-sm">No hay requerimientos que coincidan.</td></tr>
                 ) : filtrados.map((r) => (
-                  <tr key={r.ID_REQ} className="border-b last:border-0 hover:bg-gray-50 transition">
+                  <tr key={r.ID_REQ} className={`border-b last:border-0 hover:bg-gray-50 transition ${r.NOTIFICAR === "SI" ? "bg-red-50/60" : ""}`}>
                     <td className="px-5 py-4 font-mono text-xs text-gray-400 whitespace-nowrap">{r.ID_REQ}</td>
                     <td className="px-5 py-4 font-semibold text-gray-800 whitespace-nowrap">{r.CLIENTE}</td>
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.CODIGO || "—"}</td>
@@ -271,9 +280,16 @@ export default function AnalistaPage() {
                     </td>
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.TRANSPORTISTA || "—"}</td>
                     <td className="px-5 py-4">
-                      <span className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_PILL[r.STATUS] || "bg-gray-100 text-gray-500"}`}>
-                        {r.STATUS}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_PILL[r.STATUS] || "bg-gray-100 text-gray-500"}`}>
+                          {r.STATUS}
+                        </span>
+                        {r.NOTIFICAR === "SI" && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium whitespace-nowrap animate-pulse">
+                            🔴 Cambio
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <button onClick={() => abrirDetalle(r)} className="text-sm text-blue-600 font-medium hover:underline whitespace-nowrap">
@@ -300,6 +316,11 @@ export default function AnalistaPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-sm font-bold text-blue-600">{selected.ID_REQ}</span>
                     {selected.CODIGO && (<><span className="text-gray-300">·</span><span className="font-mono text-sm font-bold text-gray-600">{selected.CODIGO}</span></>)}
+                    {selected.NOTIFICAR === "SI" && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">
+                        🔴 Cambio del ejecutivo
+                      </span>
+                    )}
                   </div>
                   <h2 className="text-lg font-semibold text-gray-900">{selected.CLIENTE}</h2>
                   <p className="text-sm text-gray-400">{selected["RAZON SOCIAL"]}</p>

@@ -34,8 +34,11 @@ export const api = {
   editarRequerimiento: (id: string, rol: string, data: Record<string, string>, ticket?: string) =>
     post("editarRequerimiento", { "ID_REQ": id, rol, ticket, ...data }),
 
-  cambiarStatus: (id: string, status: string) =>
-    post("cambiarStatus", { "ID_REQ": id, status }),
+  cambiarStatus: (id: string, status: string, rol?: string, ticket?: string) =>
+    post("cambiarStatus", { "ID_REQ": id, status, rol, ticket }),
+
+  marcarVisto: (id: string) =>
+    post("marcarVisto", { "ID_REQ": id }),
 
   getTransportistas: () =>
     get({ action: "getTransportistas" }),
