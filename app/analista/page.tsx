@@ -37,6 +37,62 @@ function formatFecha(valor: string): string {
   return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+// Convierte una fecha DD/MM/YYYY a "viernes 19/06" para el resumen de movilidad.
+function fechaConDia(valor: string): string {
+  if (!valor) return "—";
+  const dmy = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!dmy) return formatFecha(valor);
+  const [, d, m, y] = dmy;
+  const fecha = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+  if (isNaN(fecha.getTime())) return formatFecha(valor);
+  const dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const nombreDia = dias[fecha.getDay()];
+  return `${nombreDia} ${d.padStart(2, "0")}/${m.padStart(2, "0")}`;
+}
+
+// Convierte "13:00" a "1:00pm" para que el resumen se lea como en el ejemplo.
+function horaAmPm(valor: string): string {
+  if (!valor) return "";
+  const m = valor.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return valor;
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const ampm = h >= 12 ? "pm" : "am";
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${min}${ampm}`;
+}
+
+// Convierte el texto de elementos "elem-marca-cant | elem-marca-cant" en una
+// lista de líneas "01 elem marca" lista para el detalle de la movilidad.
+function elementosParaResumen(elementosStr: string): string {
+  if (!elementosStr) return "—";
+  return elementosStr.split(" | ").map((item) => {
+    const [elem = "", marca = "", cant = ""] = item.split("-");
+    const cantNum = cant.replace(/\D/g, "");
+    const cantTxt = cantNum ? cantNum.padStart(2, "0") : "";
+    return [cantTxt, elem, marca].filter(Boolean).join(" ");
+  }).join(", ");
+}
+
+function armarResumenMovilidad(reqs: Requerimiento[]): string {
+  return reqs.map((r, i) => {
+    const lineas = [
+      `MOVILIDAD ${i + 1}:`,
+      `-\tPunto de recojo: ${r["RECOJO EN"] || "—"}`,
+      `-\tPunto de llegada: ${r["ENTREGA EN"] || "—"}`,
+      `-\tDía: ${fechaConDia(r.FECHA)}`,
+    ];
+    if (r["HORARIO DE DESPACHO"]) lineas.push(`-\tHora de despacho: ${horaAmPm(r["HORARIO DE DESPACHO"])}`);
+    if (r["HORARIO ENTREGA"]) lineas.push(`-\tHora de entrega: ${horaAmPm(r["HORARIO ENTREGA"])} (en el punto)`);
+    if (r["HORARIO RECOJO"]) lineas.push(`-\tHora de recojo: ${horaAmPm(r["HORARIO RECOJO"])}`);
+    if (r["PERSONA DE CONTACTO"]) lineas.push(`-\tPersona de contacto: ${r["PERSONA DE CONTACTO"]}`);
+    if (r["TELEFONO DE CONTACTO"]) lineas.push(`-\tTeléfono de contacto: ${r["TELEFONO DE CONTACTO"]}`);
+    lineas.push(`-\tDetalle: ${elementosParaResumen(r.ELEMENTOS)}.`);
+    return lineas.join("\n");
+  }).join("\n\n");
+}
+
 const OTRO = "__otro__";
 
 export default function AnalistaPage() {
@@ -48,6 +104,9 @@ export default function AnalistaPage() {
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [selected, setSelected] = useState<Requerimiento | null>(null);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [mostrarResumen, setMostrarResumen] = useState(false);
+  const [textoResumen, setTextoResumen] = useState("");
   const [logCambios, setLogCambios] = useState<any[]>([]);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -77,6 +136,32 @@ export default function AnalistaPage() {
   function verificarPin() {
     if (pin === PIN_CORRECTO) { setAutenticado(true); setPinError(false); }
     else { setPinError(true); setPin(""); }
+  }
+
+  function toggleSeleccion(id: string) {
+    setSeleccionados(prev => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  }
+
+  function generarResumen() {
+    const reqsSel = reqs.filter(r => seleccionados.has(r.ID_REQ));
+    if (reqsSel.length === 0) return;
+    setTextoResumen(armarResumenMovilidad(reqsSel));
+    setMostrarResumen(true);
+  }
+
+  async function copiarResumen() {
+    try {
+      await navigator.clipboard.writeText(textoResumen);
+      setMsg("Resumen copiado al portapapeles.");
+      setTimeout(() => setMsg(""), 3000);
+    } catch {
+      // Si el navegador bloquea el clipboard, el textarea ya permite seleccionar y copiar manualmente.
+    }
   }
 
   function abrirDetalle(req: Requerimiento) {
@@ -245,11 +330,26 @@ export default function AnalistaPage() {
           ))}
         </div>
 
+        {seleccionados.size > 0 && (
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-4">
+            <p className="text-sm text-blue-700 font-medium">{seleccionados.size} requerimiento{seleccionados.size > 1 ? "s" : ""} seleccionado{seleccionados.size > 1 ? "s" : ""}</p>
+            <div className="flex gap-2">
+              <button onClick={generarResumen} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                📋 Generar resumen de movilidad
+              </button>
+              <button onClick={() => setSeleccionados(new Set())} className="text-sm text-gray-500 hover:text-gray-700 px-2">
+                Limpiar
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b">
+                  <th className="px-5 py-3.5 w-10"></th>
                   {["ID REQ", "CLIENTE", "CÓDIGO", "SOLICITANTE", "FECHA", "RECOJO → ENTREGA", "SERVICIO", "ELEMENTOS", "COTIZACIÓN", "TRANSPORTISTA", "ESTADO", ""].map((h) => (
                     <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 tracking-wider whitespace-nowrap">{h}</th>
                   ))}
@@ -257,11 +357,19 @@ export default function AnalistaPage() {
               </thead>
               <tbody>
                 {cargando ? (
-                  <tr><td colSpan={12} className="text-center py-12 text-gray-400 text-sm">Cargando...</td></tr>
+                  <tr><td colSpan={13} className="text-center py-12 text-gray-400 text-sm">Cargando...</td></tr>
                 ) : filtrados.length === 0 ? (
-                  <tr><td colSpan={12} className="text-center py-12 text-gray-400 text-sm">No hay requerimientos que coincidan.</td></tr>
+                  <tr><td colSpan={13} className="text-center py-12 text-gray-400 text-sm">No hay requerimientos que coincidan.</td></tr>
                 ) : filtrados.map((r) => (
                   <tr key={r.ID_REQ} className={`border-b last:border-0 hover:bg-gray-50 transition ${r.NOTIFICAR === "SI" ? "bg-red-50/60" : ""}`}>
+                    <td className="px-5 py-4">
+                      <input
+                        type="checkbox"
+                        checked={seleccionados.has(r.ID_REQ)}
+                        onChange={() => toggleSeleccion(r.ID_REQ)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                      />
+                    </td>
                     <td className="px-5 py-4 font-mono text-xs text-gray-400 whitespace-nowrap">{r.ID_REQ}</td>
                     <td className="px-5 py-4 font-semibold text-gray-800 whitespace-nowrap">{r.CLIENTE}</td>
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.CODIGO || "—"}</td>
@@ -464,6 +572,39 @@ export default function AnalistaPage() {
                   {loading ? "Guardando..." : "Guardar cambios"}
                 </button>
                 <button onClick={() => setSelected(null)} className="text-sm text-gray-400 hover:text-gray-600 px-3">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarResumen && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setMostrarResumen(false); }}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="px-6 py-5 border-b flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Resumen de movilidad</h2>
+                <p className="text-sm text-gray-400">Selecciona el texto o usa el botón para copiarlo.</p>
+              </div>
+              <button onClick={() => setMostrarResumen(false)} className="text-gray-300 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-5">
+              <textarea
+                readOnly
+                value={textoResumen}
+                rows={14}
+                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                className="w-full border rounded-xl px-3 py-2 text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              />
+              <div className="mt-4 flex gap-3">
+                <button onClick={copiarResumen}
+                  className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition">
+                  📋 Copiar todo
+                </button>
+                <button onClick={() => setMostrarResumen(false)} className="text-sm text-gray-400 hover:text-gray-600 px-3">
+                  Cerrar
+                </button>
               </div>
             </div>
           </div>
