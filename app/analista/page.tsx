@@ -65,32 +65,44 @@ function horaAmPm(valor: string): string {
 
 // Convierte el texto de elementos "elem-marca-cant | elem-marca-cant" en una
 // lista de líneas "01 elem marca" lista para el detalle de la movilidad.
-function elementosParaResumen(elementosStr: string): string {
+// Detalle con cada elemento en su propia línea, alineado bajo "Detalle: ".
+// La sangría usa espacios para que coincida visualmente con el inicio del texto tras "Detalle: ".
+const SANGRIA_DETALLE = " ".repeat("-\tDetalle: ".length);
+
+function elementosParaDetalle(elementosStr: string): string {
   if (!elementosStr) return "—";
-  return elementosStr.split(" | ").map((item) => {
+  const lineas = elementosStr.split(" | ").map((item) => {
     const [elem = "", marca = "", cant = ""] = item.split("-");
     const cantNum = cant.replace(/\D/g, "");
     const cantTxt = cantNum ? cantNum.padStart(2, "0") : "";
     return [cantTxt, elem, marca].filter(Boolean).join(" ");
-  }).join(", ");
+  });
+  return lineas.map((l, i) => {
+    const esUltimo = i === lineas.length - 1;
+    const sufijo = esUltimo ? "." : "";
+    return i === 0 ? `${l}${sufijo}` : `${SANGRIA_DETALLE}${l}${sufijo}`;
+  }).join("\n");
 }
 
 function armarResumenMovilidad(reqs: Requerimiento[]): string {
-  return reqs.map((r, i) => {
-    const lineas = [
-      `MOVILIDAD ${i + 1}:`,
-      `-\tPunto de recojo: ${r["RECOJO EN"] || "—"}`,
-      `-\tPunto de llegada: ${r["ENTREGA EN"] || "—"}`,
-      `-\tDía: ${fechaConDia(r.FECHA)}`,
-    ];
+  const lineas: string[] = ["MOVILIDAD 1:"];
+  const multiplesPuntos = reqs.length > 1;
+
+  reqs.forEach((r, i) => {
+    const prefijo = multiplesPuntos ? `PUNTO ${i + 1}` : "Punto";
+    lineas.push(`-\t${prefijo} de recojo: ${r["RECOJO EN"] || "—"}`);
+    lineas.push(`-\t${prefijo} de llegada: ${r["ENTREGA EN"] || "—"}`);
+    lineas.push(`-\tDía: ${fechaConDia(r.FECHA)}`);
     if (r["HORARIO DE DESPACHO"]) lineas.push(`-\tHora de despacho: ${horaAmPm(r["HORARIO DE DESPACHO"])}`);
-    if (r["HORARIO ENTREGA"]) lineas.push(`-\tHora de entrega: ${horaAmPm(r["HORARIO ENTREGA"])} (en el punto)`);
+    if (r["HORARIO ENTREGA"]) lineas.push(`-\tHora de entrega: ${horaAmPm(r["HORARIO ENTREGA"])}`);
     if (r["HORARIO RECOJO"]) lineas.push(`-\tHora de recojo: ${horaAmPm(r["HORARIO RECOJO"])}`);
     if (r["PERSONA DE CONTACTO"]) lineas.push(`-\tPersona de contacto: ${r["PERSONA DE CONTACTO"]}`);
     if (r["TELEFONO DE CONTACTO"]) lineas.push(`-\tTeléfono de contacto: ${r["TELEFONO DE CONTACTO"]}`);
-    lineas.push(`-\tDetalle: ${elementosParaResumen(r.ELEMENTOS)}.`);
-    return lineas.join("\n");
-  }).join("\n\n");
+    lineas.push(`-\tDetalle: ${elementosParaDetalle(r.ELEMENTOS)}`);
+    if (i < reqs.length - 1) lineas.push(""); // línea en blanco entre puntos
+  });
+
+  return lineas.join("\n");
 }
 
 const OTRO = "__otro__";
@@ -251,7 +263,10 @@ export default function AnalistaPage() {
   }
 
   const filtrados = reqs.filter((r) => {
-    const matchStatus = filtroStatus === "TODOS" || r.STATUS === filtroStatus;
+    const matchStatus =
+      filtroStatus === "TODOS" ? true :
+      filtroStatus === "CAMBIOS" ? r.NOTIFICAR === "SI" :
+      r.STATUS === filtroStatus;
     const q = busqueda.toLowerCase();
     const matchBusqueda = !q || [r.CLIENTE, r.SOLICITANTE, r.ID_REQ, r.ELEMENTOS, r.CODIGO]
       .some((v) => String(v).toLowerCase().includes(q));
@@ -320,12 +335,14 @@ export default function AnalistaPage() {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
-          {["TODOS", ...STATUSES].map((s) => (
+          {["TODOS", ...STATUSES, "CAMBIOS"].map((s) => (
             <button key={s} onClick={() => setFiltroStatus(s)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition border ${
-                filtroStatus === s ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                filtroStatus === s
+                  ? s === "CAMBIOS" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600"
+                  : s === "CAMBIOS" ? "bg-red-50 text-red-600 border-red-200 hover:border-red-400" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
               }`}>
-              {s === "TODOS" ? "Todos" : s}
+              {s === "TODOS" ? "Todos" : s === "CAMBIOS" ? `🔴 Cambios sin ver (${conteos.cambios})` : s}
             </button>
           ))}
         </div>
