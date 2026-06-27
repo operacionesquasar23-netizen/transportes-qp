@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   FECHA: "", AREA: "People", CLIENTE: "", CODIGO: "", PERSONAS: "", MARCA: "",
   "RECOJO EN": "Almacén Surco", "ENTREGA EN": "", SERVICIO: "IDA", "RAZON SOCIAL": "",
   "HORARIO DE DESPACHO": "", "HORARIO ENTREGA": "", "HORARIO RECOJO": "",
+  "PERSONA DE CONTACTO": "", "TELEFONO DE CONTACTO": "",
 };
 
 function elToStr(items: Elemento[]): string {
@@ -258,6 +259,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
       "HORARIO DE DESPACHO": req["HORARIO DE DESPACHO"] || "",
       "HORARIO ENTREGA": req["HORARIO ENTREGA"] || "",
       "HORARIO RECOJO": req["HORARIO RECOJO"] || "",
+      "PERSONA DE CONTACTO": req["PERSONA DE CONTACTO"] || "",
+      "TELEFONO DE CONTACTO": req["TELEFONO DE CONTACTO"] || "",
     });
     setElementos(strToEl(req.ELEMENTOS));
     setEditId(req.ID_REQ);
@@ -306,6 +309,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
           "HORARIO DE DESPACHO": normalizarHoraCelda(porHeader["HORARIO SALIDA"] ?? porHeader["HORARIO DE DESPACHO"]),
           "HORARIO ENTREGA": normalizarHoraCelda(porHeader["HORARIO LLEGADA"] ?? porHeader["HORARIO ENTREGA"]),
           "HORARIO RECOJO": normalizarHoraCelda(porHeader["HORARIO RECOJO"]),
+          "PERSONA DE CONTACTO": textoCelda(porHeader["PERSONA DE CONTACTO"]),
+          "TELEFONO DE CONTACTO": textoCelda(porHeader["TELEFONO DE CONTACTO"]),
           "RAZON SOCIAL": textoCelda(porHeader["RAZON SOCIAL"]),
           AREA: "People",
           "RECOJO EN": "Almacén Surco",
@@ -564,6 +569,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <Campo label="Recojo en" value={form["RECOJO EN"]} onChange={(v) => setF("RECOJO EN", v)} required />
               <Campo label="Entrega en" value={form["ENTREGA EN"]} onChange={(v) => setF("ENTREGA EN", v)} required />
               <Campo label="Personas" value={form.PERSONAS} onChange={(v) => setF("PERSONAS", v)} placeholder="Ej: 2 (1 supervisor, 1 anfitriona)" />
+              <Campo label="Persona de contacto" value={form["PERSONA DE CONTACTO"]} onChange={(v) => setF("PERSONA DE CONTACTO", v)} />
+              <Campo label="Teléfono de contacto" value={form["TELEFONO DE CONTACTO"]} onChange={(v) => setF("TELEFONO DE CONTACTO", v)} type="tel" />
             </div>
 
             <div className="mt-6">
@@ -629,7 +636,7 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    {["Fecha", "Código", "Marca", "Personas", "Elementos", "Servicio", "Entrega en", "Despacho", "Llegada", "Recojo"].map(h => (
+                    {["Fecha", "Código", "Marca", "Personas", "Elementos", "Servicio", "Entrega en", "Despacho", "Llegada", "Recojo", "Contacto", "Teléfono"].map(h => (
                       <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-400 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -647,6 +654,8 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                       <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{f["HORARIO DE DESPACHO"]}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{f["HORARIO ENTREGA"]}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{f["HORARIO RECOJO"]}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f["PERSONA DE CONTACTO"]}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{f["TELEFONO DE CONTACTO"]}</td>
                     </tr>
                   ))}
                 </tbody>

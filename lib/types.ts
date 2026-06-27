@@ -16,6 +16,8 @@ export interface Requerimiento {
   "HORARIO DE DESPACHO": string;
   "HORARIO ENTREGA": string;
   "HORARIO RECOJO": string;
+  "PERSONA DE CONTACTO": string;
+  "TELEFONO DE CONTACTO": string;
   OBSERVACIONES: string;
   SERVICIO: string;
   COTIZACION: string;

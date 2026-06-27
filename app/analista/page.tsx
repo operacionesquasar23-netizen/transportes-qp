@@ -347,6 +347,8 @@ export default function AnalistaPage() {
                 <Info label="Personas" value={selected.PERSONAS} />
                 <Info label="Recojo en" value={selected["RECOJO EN"]} />
                 <Info label="Entrega en" value={selected["ENTREGA EN"]} />
+                <Info label="Persona de contacto" value={selected["PERSONA DE CONTACTO"]} />
+                <Info label="Teléfono de contacto" value={selected["TELEFONO DE CONTACTO"]} />
               </div>
               {(selected["HORARIO DE DESPACHO"] || selected["HORARIO ENTREGA"] || selected["HORARIO RECOJO"]) && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
