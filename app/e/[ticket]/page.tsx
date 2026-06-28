@@ -26,10 +26,29 @@ function elToStr(items: Elemento[]): string {
 }
 function strToEl(str: string): Elemento[] {
   if (!str) return [{ ...EMPTY_EL }];
-  return str.split(" | ").map(item => {
-    const [elemento = "", marca = "", cantidad = ""] = item.split("-");
-    return { elemento, marca, cantidad };
-  });
+  if (str.includes(" | ")) {
+    return str.split(" | ").map(item => {
+      const [elemento = "", marca = "", cantidad = ""] = item.split("-");
+      return { elemento, marca, cantidad };
+    });
+  }
+  return [{ elemento: str.trim(), marca: "", cantidad: "" }];
+}
+
+// Muestra el campo ELEMENTOS tal cual sea su formato (estructurado o texto libre de Excel)
+// como una lista de líneas legibles, sin asumir separadores que puedan no existir.
+function elementosParaMostrar(elementosStr: string): string[] {
+  if (!elementosStr) return [];
+  if (elementosStr.includes(" | ")) {
+    return elementosStr.split(" | ").map((item) => {
+      const [elem, marca, cant] = item.split("-");
+      return `${elem}${marca ? ` · ${marca}` : ""}${cant ? ` · ${cant} und.` : ""}`;
+    });
+  }
+  if (elementosStr.includes(",")) {
+    return elementosStr.split(",").map((i) => i.trim()).filter(Boolean);
+  }
+  return [elementosStr.trim()];
 }
 function formatFecha(valor: string): string {
   if (!valor) return "—";
@@ -525,14 +544,9 @@ export default function EjecutivoPage({ params }: { params: { ticket: string } }
                       <p className="font-semibold text-gray-900">{r.CLIENTE || "—"}</p>
                       {r.ELEMENTOS && (
                         <div className="mt-1">
-                          {r.ELEMENTOS.split(" | ").map((item, i) => {
-                            const [elem, marca, cant] = item.split("-");
-                            return (
-                              <p key={i} className="text-sm text-gray-500">
-                                {elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant} und.` : ""}
-                              </p>
-                            );
-                          })}
+                          {elementosParaMostrar(r.ELEMENTOS).map((item, i) => (
+                            <p key={i} className="text-sm text-gray-500">{item}</p>
+                          ))}
                         </div>
                       )}
                       <p className="text-sm text-gray-500 mt-1">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</p>

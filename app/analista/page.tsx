@@ -21,10 +21,16 @@ function elToStr(items: Elemento[]): string {
 }
 function strToEl(str: string): Elemento[] {
   if (!str) return [{ ...EMPTY_EL }];
-  return str.split(" | ").map(item => {
-    const [elemento = "", marca = "", cantidad = ""] = item.split("-");
-    return { elemento, marca, cantidad };
-  });
+  // Formato estructurado: "elemento-marca-cantidad | elemento-marca-cantidad"
+  if (str.includes(" | ")) {
+    return str.split(" | ").map(item => {
+      const [elemento = "", marca = "", cantidad = ""] = item.split("-");
+      return { elemento, marca, cantidad };
+    });
+  }
+  // Texto libre de carga masiva por Excel: lo dejamos como un solo elemento editable,
+  // con todo el texto en el campo "elemento" para no perder información.
+  return [{ elemento: str.trim(), marca: "", cantidad: "" }];
 }
 function formatFecha(valor: string): string {
   if (!valor) return "—";
@@ -69,12 +75,25 @@ function horaAmPm(valor: string): string {
 // La sangría usa espacios para que coincida visualmente con el inicio del texto tras "Detalle: ".
 function elementosParaDetalle(elementosStr: string): string[] {
   if (!elementosStr) return ["—"];
-  return elementosStr.split(" | ").map((item) => {
-    const [elem = "", marca = "", cant = ""] = item.split("-");
-    const cantNum = cant.replace(/\D/g, "");
-    const cantTxt = cantNum ? cantNum.padStart(2, "0") : "";
-    return [cantTxt, elem, marca].filter(Boolean).join(" ");
-  });
+
+  // Formato estructurado del formulario manual: "elemento-marca-cantidad | elemento-marca-cantidad"
+  if (elementosStr.includes(" | ")) {
+    return elementosStr.split(" | ").map((item) => {
+      const [elem = "", marca = "", cant = ""] = item.split("-");
+      const cantNum = cant.replace(/\D/g, "");
+      const cantTxt = cantNum ? cantNum.padStart(2, "0") : "";
+      return [cantTxt, elem, marca].filter(Boolean).join(" ");
+    });
+  }
+
+  // Texto libre de la carga masiva por Excel: "1 body Mikes, 1 modulo Mikes, ..."
+  // Cada elemento ya viene completo, solo separamos por coma.
+  if (elementosStr.includes(",")) {
+    return elementosStr.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+
+  // Un solo elemento sin separadores.
+  return [elementosStr.trim()];
 }
 
 function armarResumenMovilidad(reqs: Requerimiento[]): string {
@@ -389,10 +408,9 @@ export default function AnalistaPage() {
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap text-sm">{r["RECOJO EN"]} → {r["ENTREGA EN"]}</td>
                     <td className="px-5 py-4 text-gray-600 whitespace-nowrap">{r.SERVICIO}</td>
                     <td className="px-5 py-4 text-gray-600 max-w-[180px]">
-                      {r.ELEMENTOS ? r.ELEMENTOS.split(" | ").map((item, i) => {
-                        const [elem, marca, cant] = item.split("-");
-                        return <p key={i} className="text-xs text-gray-500 truncate">{elem}{marca ? ` · ${marca}` : ""}{cant ? ` · ${cant}` : ""}</p>;
-                      }) : <span className="text-gray-300">—</span>}
+                      {r.ELEMENTOS ? elementosParaDetalle(r.ELEMENTOS).map((item, i) => (
+                        <p key={i} className="text-xs text-gray-500 truncate">{item}</p>
+                      )) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-5 py-4 text-gray-700 whitespace-nowrap font-medium">
                       {r.COTIZACION ? `S/ ${r.COTIZACION}` : <span className="text-gray-300">—</span>}
