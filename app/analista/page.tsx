@@ -67,21 +67,14 @@ function horaAmPm(valor: string): string {
 // lista de líneas "01 elem marca" lista para el detalle de la movilidad.
 // Detalle con cada elemento en su propia línea, alineado bajo "Detalle: ".
 // La sangría usa espacios para que coincida visualmente con el inicio del texto tras "Detalle: ".
-const SANGRIA_DETALLE = " ".repeat("-\tDetalle: ".length);
-
-function elementosParaDetalle(elementosStr: string): string {
-  if (!elementosStr) return "—";
-  const lineas = elementosStr.split(" | ").map((item) => {
+function elementosParaDetalle(elementosStr: string): string[] {
+  if (!elementosStr) return ["—"];
+  return elementosStr.split(" | ").map((item) => {
     const [elem = "", marca = "", cant = ""] = item.split("-");
     const cantNum = cant.replace(/\D/g, "");
     const cantTxt = cantNum ? cantNum.padStart(2, "0") : "";
     return [cantTxt, elem, marca].filter(Boolean).join(" ");
   });
-  return lineas.map((l, i) => {
-    const esUltimo = i === lineas.length - 1;
-    const sufijo = esUltimo ? "." : "";
-    return i === 0 ? `${l}${sufijo}` : `${SANGRIA_DETALLE}${l}${sufijo}`;
-  }).join("\n");
 }
 
 function armarResumenMovilidad(reqs: Requerimiento[]): string {
@@ -89,16 +82,17 @@ function armarResumenMovilidad(reqs: Requerimiento[]): string {
   const multiplesPuntos = reqs.length > 1;
 
   reqs.forEach((r, i) => {
-    const prefijo = multiplesPuntos ? `PUNTO ${i + 1}` : "Punto";
-    lineas.push(`-\t${prefijo} de recojo: ${r["RECOJO EN"] || "—"}`);
-    lineas.push(`-\t${prefijo} de llegada: ${r["ENTREGA EN"] || "—"}`);
-    lineas.push(`-\tDía: ${fechaConDia(r.FECHA)}`);
-    if (r["HORARIO DE DESPACHO"]) lineas.push(`-\tHora de despacho: ${horaAmPm(r["HORARIO DE DESPACHO"])}`);
-    if (r["HORARIO ENTREGA"]) lineas.push(`-\tHora de entrega: ${horaAmPm(r["HORARIO ENTREGA"])}`);
-    if (r["HORARIO RECOJO"]) lineas.push(`-\tHora de recojo: ${horaAmPm(r["HORARIO RECOJO"])}`);
-    if (r["PERSONA DE CONTACTO"]) lineas.push(`-\tPersona de contacto: ${r["PERSONA DE CONTACTO"]}`);
-    if (r["TELEFONO DE CONTACTO"]) lineas.push(`-\tTeléfono de contacto: ${r["TELEFONO DE CONTACTO"]}`);
-    lineas.push(`-\tDetalle: ${elementosParaDetalle(r.ELEMENTOS)}`);
+    if (multiplesPuntos) lineas.push(`PUNTO ${i + 1}`);
+    lineas.push(`- Punto de recojo: ${r["RECOJO EN"] || "—"}`);
+    lineas.push(`- Punto de llegada: ${r["ENTREGA EN"] || "—"}`);
+    lineas.push(`- Día: ${fechaConDia(r.FECHA)}`);
+    if (r["HORARIO DE DESPACHO"]) lineas.push(`- Hora de despacho: ${horaAmPm(r["HORARIO DE DESPACHO"])}`);
+    if (r["HORARIO ENTREGA"]) lineas.push(`- Hora de entrega: ${horaAmPm(r["HORARIO ENTREGA"])}`);
+    if (r["HORARIO RECOJO"]) lineas.push(`- Hora de recojo: ${horaAmPm(r["HORARIO RECOJO"])}`);
+    if (r["PERSONA DE CONTACTO"]) lineas.push(`- Persona de contacto: ${r["PERSONA DE CONTACTO"]}`);
+    if (r["TELEFONO DE CONTACTO"]) lineas.push(`- Teléfono de contacto: ${r["TELEFONO DE CONTACTO"]}`);
+    lineas.push(`- Detalle:`);
+    elementosParaDetalle(r.ELEMENTOS).forEach((item) => lineas.push(`   • ${item}`));
     if (i < reqs.length - 1) lineas.push(""); // línea en blanco entre puntos
   });
 
