@@ -27,8 +27,8 @@ export default function Home() {
       </div>
 
       {/* Tarjetas */}
-      <div className="max-w-4xl mx-auto px-8 -mt-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="max-w-5xl mx-auto px-8 -mt-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {/* Ejecutivo */}
           <div className="bg-white rounded-2xl border p-7 shadow-sm hover:shadow-md transition">
             <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl mb-4">📋</div>
@@ -60,6 +60,16 @@ export default function Home() {
             <p className="text-sm text-gray-500 mb-5">Gestiona todas las solicitudes, asigna transportistas y actualiza estados.</p>
             <a href="/analista" className="inline-block text-purple-600 text-sm font-medium hover:underline">
               Acceder al panel →
+            </a>
+          </div>
+
+          {/* Seguimiento */}
+          <div className="bg-white rounded-2xl border p-7 shadow-sm hover:shadow-md transition">
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-2xl mb-4">🔍</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Seguimiento</h2>
+            <p className="text-sm text-gray-500 mb-5">Consulta el estado de cualquier solicitud por cliente, código o ID.</p>
+            <a href="/seguimiento" className="inline-block text-green-600 text-sm font-medium hover:underline">
+              Ver estado de solicitudes →
             </a>
           </div>
         </div>
